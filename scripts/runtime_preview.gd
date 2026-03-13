@@ -16,6 +16,7 @@ var player_body: CharacterBody2D
 var player_data: Dictionary = {}
 var active_interactable_id := ""
 var consumed_object_ids := {}
+var _world_ground: Node2D
 
 @onready var world: Node2D = $World
 @onready var title_label: Label = $UI/Panel/Margin/VBox/TitleLabel
@@ -29,20 +30,6 @@ func _ready() -> void:
 	_build_world()
 	_update_header()
 	_show_message("运行预览已启动。方向键移动，E 键交互，右上角可返回编辑器。")
-	queue_redraw()
-
-func _draw() -> void:
-	var rect := get_viewport_rect()
-	draw_rect(rect, Color("101828"), true)
-	for tile_data in tile_cells:
-		var terrain := String(tile_data.get("terrain", "ground"))
-		var color: Color = TERRAIN_COLORS.get(terrain, Color("334155"))
-		var cell := Vector2(float(tile_data.get("x", 0)) * GRID_SIZE, float(tile_data.get("y", 0)) * GRID_SIZE)
-		draw_rect(Rect2(cell, Vector2.ONE * GRID_SIZE), color, true)
-	for x in range(0, int(rect.size.x), int(GRID_SIZE)):
-		draw_line(Vector2(x, 0), Vector2(x, rect.size.y), Color(1, 1, 1, 0.05), 1.0)
-	for y in range(0, int(rect.size.y), int(GRID_SIZE)):
-		draw_line(Vector2(0, y), Vector2(rect.size.x, y), Color(1, 1, 1, 0.05), 1.0)
 
 func _physics_process(_delta: float) -> void:
 	_update_player_movement()
@@ -63,6 +50,15 @@ func _build_world() -> void:
 	player_data = {}
 	active_interactable_id = ""
 	consumed_object_ids.clear()
+
+	_world_ground = Node2D.new()
+	_world_ground.name = "WorldGround"
+	_world_ground.set_script(_create_ground_drawer_script())
+	_world_ground.set("tile_cells", tile_cells)
+	_world_ground.set("grid_size", GRID_SIZE)
+	_world_ground.set("terrain_colors", TERRAIN_COLORS)
+	world.add_child(_world_ground)
+
 	_create_tile_collisions()
 
 	for object_data in scene_objects:
@@ -84,6 +80,50 @@ func _build_world() -> void:
 	for object_data in scene_objects:
 		if String(object_data.get("type", "")) != "player":
 			_create_world_object(object_data)
+
+func _create_ground_drawer_script() -> GDScript:
+	var code := """extends Node2D
+
+var tile_cells: Array = []
+var grid_size: float = 32.0
+var terrain_colors: Dictionary = {}
+
+func _ready() -> void:
+	z_index = -10
+	queue_redraw()
+
+func _draw() -> void:
+	var vp_size := get_viewport_rect().size
+	var cam_pos := Vector2.ZERO
+	var camera := get_viewport().get_camera_2d()
+	if camera:
+		cam_pos = camera.global_position - vp_size / 2.0
+
+	var bg_rect := Rect2(cam_pos, vp_size)
+	draw_rect(bg_rect, Color("101828"), true)
+
+	for tile_data in tile_cells:
+		var terrain: String = str(tile_data.get("terrain", "ground"))
+		var color: Color = terrain_colors.get(terrain, Color("334155"))
+		var cell := Vector2(float(tile_data.get("x", 0)) * grid_size, float(tile_data.get("y", 0)) * grid_size)
+		draw_rect(Rect2(cell, Vector2.ONE * grid_size), color, true)
+
+	var start_x := int(cam_pos.x / grid_size) * int(grid_size)
+	var start_y := int(cam_pos.y / grid_size) * int(grid_size)
+	var end_x := int(cam_pos.x + vp_size.x) + int(grid_size)
+	var end_y := int(cam_pos.y + vp_size.y) + int(grid_size)
+	for x in range(start_x, end_x, int(grid_size)):
+		draw_line(Vector2(x, cam_pos.y), Vector2(x, cam_pos.y + vp_size.y), Color(1, 1, 1, 0.05), 1.0)
+	for y in range(start_y, end_y, int(grid_size)):
+		draw_line(Vector2(cam_pos.x, y), Vector2(cam_pos.x + vp_size.x, y), Color(1, 1, 1, 0.05), 1.0)
+
+func _process(_delta: float) -> void:
+	queue_redraw()
+"""
+	var script := GDScript.new()
+	script.source_code = code
+	script.reload()
+	return script
 
 func _create_tile_collisions() -> void:
 	for tile_data in tile_cells:
