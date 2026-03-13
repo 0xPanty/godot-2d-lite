@@ -2,8 +2,10 @@ extends Control
 
 const LogicTemplatesScript = preload("res://scripts/logic_templates.gd")
 const ProjectStoreScript = preload("res://scripts/project_store.gd")
+const UndoRedoScript = preload("res://scripts/undo_redo_manager.gd")
 const OBJECT_TYPES := ["player", "npc", "door", "chest", "trigger", "prop"]
 const TRIGGER_MODES := ["interact", "touch", "area", "auto"]
+const SAVE_DEBOUNCE_SEC := 1.5
 
 var resources: Array[Dictionary] = []
 var scene_objects: Array[Dictionary] = []
@@ -13,6 +15,8 @@ var selected_object_id := ""
 var _next_object_id := 1
 var tool_mode := "select"
 var selected_terrain := "ground"
+var _undo_redo: RefCounted
+var _save_timer: Timer
 
 @onready var resource_list: ItemList = $MainSplit/LeftPanel/ResourceList
 @onready var object_list: ItemList = $MainSplit/LeftPanel/ObjectList
@@ -30,6 +34,8 @@ var selected_terrain := "ground"
 @onready var prompt_input: TextEdit = $MainSplit/RightPanel/AIPanel/PromptInput
 
 func _ready() -> void:
+	_undo_redo = UndoRedoScript.new()
+	_setup_save_timer()
 	_setup_options()
 	_setup_dialog()
 	_bind_events()
@@ -37,7 +43,15 @@ func _ready() -> void:
 	if scene_objects.is_empty():
 		_add_object("player")
 	refresh_all()
-	append_log("Lite2D Studio 已启动。当前为 2D 轻量编辑器骨架，可继续接 AI CLI。")
+	_push_undo_state()
+	append_log("Lite2D Studio 已启动。Ctrl+Z 撤销，Ctrl+Y 重做。")
+
+func _setup_save_timer() -> void:
+	_save_timer = Timer.new()
+	_save_timer.one_shot = true
+	_save_timer.wait_time = SAVE_DEBOUNCE_SEC
+	_save_timer.timeout.connect(_do_save_snapshot)
+	add_child(_save_timer)
 
 func _setup_options() -> void:
 	for object_type in OBJECT_TYPES:
@@ -56,7 +70,82 @@ func _bind_events() -> void:
 	canvas.object_selected.connect(_on_canvas_object_selected)
 	canvas.object_moved.connect(_on_canvas_object_moved)
 	canvas.tile_painted.connect(_on_canvas_tile_painted)
+	canvas.tile_paint_ended.connect(_on_canvas_tile_paint_ended)
 	file_dialog.files_selected.connect(_on_files_selected)
+
+func _unhandled_key_input(event: InputEvent) -> void:
+	if not event is InputEventKey or not event.pressed or event.echo:
+		return
+	if event.ctrl_pressed and event.keycode == KEY_Z:
+		_perform_undo()
+		get_viewport().set_input_as_handled()
+	elif event.ctrl_pressed and event.keycode == KEY_Y:
+		_perform_redo()
+		get_viewport().set_input_as_handled()
+
+func _perform_undo() -> void:
+	if not _undo_redo.can_undo():
+		append_log("没有可撤销的操作。")
+		return
+	var state: Dictionary = _undo_redo.undo()
+	_restore_state(state)
+	refresh_all()
+	_request_save()
+	append_log("已撤销。")
+
+func _perform_redo() -> void:
+	if not _undo_redo.can_redo():
+		append_log("没有可重做的操作。")
+		return
+	var state: Dictionary = _undo_redo.redo()
+	_restore_state(state)
+	refresh_all()
+	_request_save()
+	append_log("已重做。")
+
+func _push_undo_state() -> void:
+	_undo_redo.push_state(_capture_state())
+
+func _capture_state() -> Dictionary:
+	var objects_copy: Array[Dictionary] = []
+	for obj in scene_objects:
+		objects_copy.append(obj.duplicate(true))
+	var resources_copy: Array[Dictionary] = []
+	for res_data in resources:
+		resources_copy.append(res_data.duplicate(true))
+	var tiles_copy: Array[Dictionary] = []
+	for tile in tile_cells:
+		tiles_copy.append(tile.duplicate(true))
+	return {
+		"resources": resources_copy,
+		"scene_objects": objects_copy,
+		"tile_cells": tiles_copy,
+		"next_object_id": _next_object_id,
+		"selected_object_id": selected_object_id,
+	}
+
+func _restore_state(state: Dictionary) -> void:
+	resources = []
+	for res_data in state.get("resources", []):
+		resources.append(res_data.duplicate(true))
+	scene_objects = []
+	for obj in state.get("scene_objects", []):
+		scene_objects.append(obj.duplicate(true))
+	tile_cells = []
+	for tile in state.get("tile_cells", []):
+		tile_cells.append(tile.duplicate(true))
+	_next_object_id = int(state.get("next_object_id", 1))
+	selected_object_id = String(state.get("selected_object_id", ""))
+
+func _request_save() -> void:
+	_save_timer.start()
+
+func _do_save_snapshot() -> void:
+	ProjectStoreScript.save_snapshot(resources, scene_objects, _next_object_id, tile_cells)
+
+func _record_and_save() -> void:
+	_push_undo_state()
+	_request_save()
 
 func _on_import_pressed() -> void:
 	file_dialog.popup_centered_ratio(0.75)
@@ -77,7 +166,7 @@ func _on_add_trigger_pressed() -> void:
 	_add_object("trigger")
 
 func _on_preview_pressed() -> void:
-	_save_snapshot()
+	_do_save_snapshot()
 	append_log("已生成预览快照，准备切换到运行预览。")
 	get_tree().change_scene_to_file("res://scenes/runtime_preview.tscn")
 
@@ -122,7 +211,7 @@ func _on_delete_selected_pressed() -> void:
 	if not scene_objects.is_empty():
 		selected_object_id = String(scene_objects[0].get("id", ""))
 	refresh_all()
-	_save_snapshot()
+	_record_and_save()
 	append_log("已删除对象: %s" % object_name)
 
 func _add_object(object_type: String) -> void:
@@ -137,7 +226,7 @@ func _add_object(object_type: String) -> void:
 	scene_objects.append(object_data)
 	select_object(object_id)
 	refresh_all()
-	_save_snapshot()
+	_record_and_save()
 	append_log("已添加对象: %s" % object_data["name"])
 
 func _on_resource_selected(index: int) -> void:
@@ -156,15 +245,21 @@ func _on_canvas_object_moved(object_id: String, position: Vector2) -> void:
 	var object_index := _find_object_index(object_id)
 	if object_index == -1:
 		return
-	scene_objects[object_index]["position"] = position
+	var canvas_size: Vector2 = canvas.size
+	var obj_size: Vector2 = scene_objects[object_index].get("size", Vector2(96, 96))
+	var clamped := position.clamp(Vector2.ZERO, canvas_size - obj_size)
+	scene_objects[object_index]["position"] = clamped
 	refresh_inspector()
 	refresh_object_list()
-	_save_snapshot()
+	_record_and_save()
 
 func _on_canvas_tile_painted(cell: Vector2i, terrain: String) -> void:
 	_apply_tile_change(cell, terrain)
-	_save_snapshot()
+	_request_save()
 	refresh_canvas()
+
+func _on_canvas_tile_paint_ended() -> void:
+	_push_undo_state()
 
 func _on_files_selected(paths: PackedStringArray) -> void:
 	for path in paths:
@@ -182,7 +277,7 @@ func _on_files_selected(paths: PackedStringArray) -> void:
 			"kind": "image",
 		})
 	refresh_resource_list()
-	_save_snapshot()
+	_record_and_save()
 	append_log("已导入素材数量: %s" % paths.size())
 
 func _on_apply_inspector_pressed() -> void:
@@ -201,7 +296,7 @@ func _on_apply_inspector_pressed() -> void:
 	object_data["dialogue"] = dialogue_edit.text.strip_edges()
 	scene_objects[object_index] = object_data
 	refresh_all()
-	_save_snapshot()
+	_record_and_save()
 	append_log("已更新对象属性: %s" % object_data["name"])
 
 func _on_apply_ai_pressed() -> void:
@@ -219,7 +314,7 @@ func _on_apply_ai_pressed() -> void:
 		append_log(String(note))
 
 	refresh_all()
-	_save_snapshot()
+	_record_and_save()
 	prompt_input.clear()
 	append_log("AI 指令已应用到对象: %s" % scene_objects[object_index]["name"])
 
@@ -304,9 +399,6 @@ func _find_object_index(object_id: String) -> int:
 func append_log(message: String) -> void:
 	log_output.append_text("- %s\n" % message)
 	log_output.scroll_to_line(max(log_output.get_line_count() - 1, 0))
-
-func _save_snapshot() -> void:
-	ProjectStoreScript.save_snapshot(resources, scene_objects, _next_object_id, tile_cells)
 
 func _load_snapshot() -> void:
 	var snapshot: Dictionary = ProjectStoreScript.load_snapshot()

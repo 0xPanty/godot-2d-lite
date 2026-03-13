@@ -3,6 +3,7 @@ extends Control
 signal object_selected(object_id: String)
 signal object_moved(object_id: String, position: Vector2)
 signal tile_painted(cell: Vector2i, terrain: String)
+signal tile_paint_ended()
 
 const GRID_SIZE := 32.0
 const TERRAIN_COLORS := {
@@ -19,6 +20,8 @@ var _dragging_object_id := ""
 var _drag_offset := Vector2.ZERO
 var _tool_mode := "select"
 var _selected_terrain := "ground"
+var _is_painting := false
+var _dirty_selection := false
 
 func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_PASS
@@ -26,16 +29,58 @@ func _ready() -> void:
 	queue_redraw()
 
 func set_scene_objects(scene_objects: Array[Dictionary], selected_object_id: String = "", tile_cells: Array[Dictionary] = [], tool_mode: String = "select", selected_terrain: String = "ground") -> void:
-	_scene_objects = []
-	for object_data in scene_objects:
-		_scene_objects.append(object_data.duplicate(true))
-	_tile_cells = []
-	for tile_data in tile_cells:
-		_tile_cells.append(tile_data.duplicate(true))
+	var selection_changed := _selected_object_id != selected_object_id
+	var mode_changed := _tool_mode != tool_mode or _selected_terrain != selected_terrain
 	_selected_object_id = selected_object_id
 	_tool_mode = tool_mode
 	_selected_terrain = selected_terrain
-	_rebuild()
+
+	var needs_rebuild := mode_changed or _objects_changed(scene_objects)
+	if needs_rebuild:
+		_scene_objects = []
+		for object_data in scene_objects:
+			_scene_objects.append(object_data.duplicate(true))
+		_tile_cells = []
+		for tile_data in tile_cells:
+			_tile_cells.append(tile_data.duplicate(true))
+		_rebuild()
+	elif selection_changed:
+		_tile_cells = []
+		for tile_data in tile_cells:
+			_tile_cells.append(tile_data.duplicate(true))
+		_update_selection_visual()
+		queue_redraw()
+	else:
+		_tile_cells = []
+		for tile_data in tile_cells:
+			_tile_cells.append(tile_data.duplicate(true))
+		queue_redraw()
+
+func _objects_changed(new_objects: Array[Dictionary]) -> bool:
+	if new_objects.size() != _scene_objects.size():
+		return true
+	for i in new_objects.size():
+		var new_obj := new_objects[i]
+		var old_obj := _scene_objects[i]
+		if String(new_obj.get("id", "")) != String(old_obj.get("id", "")):
+			return true
+		if String(new_obj.get("name", "")) != String(old_obj.get("name", "")):
+			return true
+		if String(new_obj.get("resource_path", "")) != String(old_obj.get("resource_path", "")):
+			return true
+		var new_pos: Vector2 = new_obj.get("position", Vector2.ZERO)
+		var old_pos: Vector2 = old_obj.get("position", Vector2.ZERO)
+		if not new_pos.is_equal_approx(old_pos):
+			return true
+	return false
+
+func _update_selection_visual() -> void:
+	for object_id in _buttons.keys():
+		var button: Button = _buttons[object_id]
+		if object_id == _selected_object_id:
+			button.modulate = Color(1.0, 0.93, 0.65)
+		else:
+			button.modulate = Color.WHITE
 
 func _rebuild() -> void:
 	for child in get_children():
@@ -59,14 +104,15 @@ func _rebuild() -> void:
 		if icon_texture:
 			button.icon = icon_texture
 
-		if String(object_data.get("id", "")) == _selected_object_id:
+		var object_id := String(object_data.get("id", ""))
+		if object_id == _selected_object_id:
 			button.modulate = Color(1.0, 0.93, 0.65)
 		else:
 			button.modulate = Color.WHITE
 
-		button.gui_input.connect(_on_object_gui_input.bind(String(object_data.get("id", ""))))
+		button.gui_input.connect(_on_object_gui_input.bind(object_id))
 		add_child(button)
-		_buttons[String(object_data.get("id", ""))] = button
+		_buttons[object_id] = button
 
 	queue_redraw()
 
@@ -89,9 +135,15 @@ func _draw() -> void:
 func _gui_input(event: InputEvent) -> void:
 	if _tool_mode != "paint":
 		return
-	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and event.pressed:
-		_paint_at(event.position)
-	elif event is InputEventMouseMotion and Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT):
+	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
+		if event.pressed:
+			_is_painting = true
+			_paint_at(event.position)
+		else:
+			if _is_painting:
+				_is_painting = false
+				emit_signal("tile_paint_ended")
+	elif event is InputEventMouseMotion and _is_painting:
 		_paint_at(event.position)
 	queue_redraw()
 
@@ -104,7 +156,7 @@ func _on_object_gui_input(event: InputEvent, object_id: String) -> void:
 			_dragging_object_id = object_id
 			_drag_offset = event.position
 			emit_signal("object_selected", object_id)
-			_rebuild()
+			_update_selection_visual()
 		else:
 			if _dragging_object_id == object_id:
 				var button: Button = _buttons.get(object_id)
