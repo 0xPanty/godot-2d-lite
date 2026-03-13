@@ -135,5 +135,7 @@ static func _deserialize_tile_cells(tile_cells: Array) -> Array[Dictionary]:
 		entry["x"] = int(entry.get("x", 0))
 		entry["y"] = int(entry.get("y", 0))
 		entry["terrain"] = String(entry.get("terrain", "ground"))
+		if not entry.has("layer"):
+			entry["layer"] = "ground"
 		deserialized.append(entry)
 	return deserialized

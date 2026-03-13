@@ -10,6 +10,9 @@ const TERRAIN_COLORS := {
 	"ground": Color("334155"),
 	"wall": Color("475569"),
 	"water": Color("1d4ed8"),
+	"grass": Color("166534"),
+	"sand": Color("a16207"),
+	"path": Color("78716c"),
 }
 
 var _scene_objects: Array[Dictionary] = []
@@ -20,20 +23,29 @@ var _dragging_object_id := ""
 var _drag_offset := Vector2.ZERO
 var _tool_mode := "select"
 var _selected_terrain := "ground"
+var _selected_layer := "ground"
 var _is_painting := false
 var _dirty_selection := false
+
+const LAYER_ORDER := ["ground", "decoration", "collision"]
+const LAYER_ALPHA := {
+	"ground": 1.0,
+	"decoration": 0.85,
+	"collision": 0.6,
+}
 
 func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_PASS
 	clip_contents = true
 	queue_redraw()
 
-func set_scene_objects(scene_objects: Array[Dictionary], selected_object_id: String = "", tile_cells: Array[Dictionary] = [], tool_mode: String = "select", selected_terrain: String = "ground") -> void:
+func set_scene_objects(scene_objects: Array[Dictionary], selected_object_id: String = "", tile_cells: Array[Dictionary] = [], tool_mode: String = "select", selected_terrain: String = "ground", selected_layer: String = "ground") -> void:
 	var selection_changed := _selected_object_id != selected_object_id
-	var mode_changed := _tool_mode != tool_mode or _selected_terrain != selected_terrain
+	var mode_changed := _tool_mode != tool_mode or _selected_terrain != selected_terrain or _selected_layer != selected_layer
 	_selected_object_id = selected_object_id
 	_tool_mode = tool_mode
 	_selected_terrain = selected_terrain
+	_selected_layer = selected_layer
 
 	var needs_rebuild := mode_changed or _objects_changed(scene_objects)
 	if needs_rebuild:
@@ -118,11 +130,19 @@ func _rebuild() -> void:
 
 func _draw() -> void:
 	draw_rect(Rect2(Vector2.ZERO, size), Color("1f2937"), true)
-	for tile_data in _tile_cells:
-		var cell := Vector2(float(tile_data.get("x", 0)) * GRID_SIZE, float(tile_data.get("y", 0)) * GRID_SIZE)
-		var terrain := String(tile_data.get("terrain", "ground"))
-		var color: Color = TERRAIN_COLORS.get(terrain, Color("334155"))
-		draw_rect(Rect2(cell, Vector2.ONE * GRID_SIZE), color, true)
+	for layer_name in LAYER_ORDER:
+		var is_active := layer_name == _selected_layer
+		var alpha: float = 1.0 if is_active else LAYER_ALPHA.get(layer_name, 0.5)
+		if not is_active and _tool_mode == "paint":
+			alpha *= 0.4
+		for tile_data in _tile_cells:
+			if String(tile_data.get("layer", "ground")) != layer_name:
+				continue
+			var cell := Vector2(float(tile_data.get("x", 0)) * GRID_SIZE, float(tile_data.get("y", 0)) * GRID_SIZE)
+			var terrain := String(tile_data.get("terrain", "ground"))
+			var color: Color = TERRAIN_COLORS.get(terrain, Color("334155"))
+			color.a = alpha
+			draw_rect(Rect2(cell, Vector2.ONE * GRID_SIZE), color, true)
 	for x in range(0, int(size.x), int(GRID_SIZE)):
 		draw_line(Vector2(x, 0), Vector2(x, size.y), Color(1, 1, 1, 0.08), 1.0)
 	for y in range(0, int(size.y), int(GRID_SIZE)):
@@ -130,7 +150,9 @@ func _draw() -> void:
 	if _tool_mode == "paint":
 		var hovered_cell := _snap_cell(get_local_mouse_position())
 		var hover_rect := Rect2(Vector2(hovered_cell.x, hovered_cell.y) * GRID_SIZE, Vector2.ONE * GRID_SIZE)
-		draw_rect(hover_rect, Color(1, 1, 1, 0.16), false, 2.0)
+		draw_rect(hover_rect, Color(1, 1, 1, 0.25), false, 2.0)
+		var layer_label := "图层: %s" % _selected_layer
+		draw_string(ThemeDB.fallback_font, Vector2(8, size.y - 8), layer_label, HORIZONTAL_ALIGNMENT_LEFT, -1, 12, Color(1, 1, 1, 0.5))
 
 func _gui_input(event: InputEvent) -> void:
 	if _tool_mode != "paint":

@@ -70,6 +70,18 @@ text = "墙体"
 layout_mode = 2
 text = "水域"
 
+[node name="GrassToolButton" type="Button" parent="MainSplit/CenterPanel/Toolbar"]
+layout_mode = 2
+text = "草地"
+
+[node name="SandToolButton" type="Button" parent="MainSplit/CenterPanel/Toolbar"]
+layout_mode = 2
+text = "沙地"
+
+[node name="PathToolButton" type="Button" parent="MainSplit/CenterPanel/Toolbar"]
+layout_mode = 2
+text = "路径"
+
 [node name="EraseToolButton" type="Button" parent="MainSplit/CenterPanel/Toolbar"]
 layout_mode = 2
 text = "擦除"
@@ -220,6 +232,9 @@ size = Vector2i(900, 560)
 [connection signal="pressed" from="MainSplit/CenterPanel/Toolbar/GroundToolButton" to="." method="_on_ground_tool_pressed"]
 [connection signal="pressed" from="MainSplit/CenterPanel/Toolbar/WallToolButton" to="." method="_on_wall_tool_pressed"]
 [connection signal="pressed" from="MainSplit/CenterPanel/Toolbar/WaterToolButton" to="." method="_on_water_tool_pressed"]
+[connection signal="pressed" from="MainSplit/CenterPanel/Toolbar/GrassToolButton" to="." method="_on_grass_tool_pressed"]
+[connection signal="pressed" from="MainSplit/CenterPanel/Toolbar/SandToolButton" to="." method="_on_sand_tool_pressed"]
+[connection signal="pressed" from="MainSplit/CenterPanel/Toolbar/PathToolButton" to="." method="_on_path_tool_pressed"]
 [connection signal="pressed" from="MainSplit/CenterPanel/Toolbar/EraseToolButton" to="." method="_on_erase_tool_pressed"]
 [connection signal="pressed" from="MainSplit/CenterPanel/Toolbar/AddPlayerButton" to="." method="_on_add_player_pressed"]
 [connection signal="pressed" from="MainSplit/CenterPanel/Toolbar/AddNPCButton" to="." method="_on_add_npc_pressed"]

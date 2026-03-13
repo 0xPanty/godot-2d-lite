@@ -5,6 +5,7 @@ const ProjectStoreScript = preload("res://scripts/project_store.gd")
 const UndoRedoScript = preload("res://scripts/undo_redo_manager.gd")
 const OBJECT_TYPES := ["player", "npc", "door", "chest", "trigger", "prop"]
 const TRIGGER_MODES := ["interact", "touch", "area", "auto"]
+const TILE_LAYERS := ["ground", "decoration", "collision"]
 const SAVE_DEBOUNCE_SEC := 1.5
 
 var resources: Array[Dictionary] = []
@@ -15,6 +16,7 @@ var selected_object_id := ""
 var _next_object_id := 1
 var tool_mode := "select"
 var selected_terrain := "ground"
+var selected_layer := "ground"
 var _undo_redo: RefCounted
 var _save_timer: Timer
 
@@ -178,25 +180,49 @@ func _on_select_tool_pressed() -> void:
 func _on_ground_tool_pressed() -> void:
 	tool_mode = "paint"
 	selected_terrain = "ground"
-	append_log("已切换到地面绘制模式。")
+	selected_layer = "ground"
+	append_log("已切换到地面绘制模式（地面层）。")
 	refresh_canvas()
 
 func _on_wall_tool_pressed() -> void:
 	tool_mode = "paint"
 	selected_terrain = "wall"
-	append_log("已切换到墙体绘制模式。")
+	selected_layer = "collision"
+	append_log("已切换到墙体绘制模式（碰撞层）。")
 	refresh_canvas()
 
 func _on_water_tool_pressed() -> void:
 	tool_mode = "paint"
 	selected_terrain = "water"
-	append_log("已切换到水域绘制模式。")
+	selected_layer = "ground"
+	append_log("已切换到水域绘制模式（地面层）。")
+	refresh_canvas()
+
+func _on_grass_tool_pressed() -> void:
+	tool_mode = "paint"
+	selected_terrain = "grass"
+	selected_layer = "decoration"
+	append_log("已切换到草地绘制模式（装饰层）。")
+	refresh_canvas()
+
+func _on_sand_tool_pressed() -> void:
+	tool_mode = "paint"
+	selected_terrain = "sand"
+	selected_layer = "decoration"
+	append_log("已切换到沙地绘制模式（装饰层）。")
+	refresh_canvas()
+
+func _on_path_tool_pressed() -> void:
+	tool_mode = "paint"
+	selected_terrain = "path"
+	selected_layer = "decoration"
+	append_log("已切换到路径绘制模式（装饰层）。")
 	refresh_canvas()
 
 func _on_erase_tool_pressed() -> void:
 	tool_mode = "paint"
 	selected_terrain = "erase"
-	append_log("已切换到地图擦除模式。")
+	append_log("已切换到地图擦除模式（当前层: %s）。" % selected_layer)
 	refresh_canvas()
 
 func _on_delete_selected_pressed() -> void:
@@ -254,7 +280,7 @@ func _on_canvas_object_moved(object_id: String, position: Vector2) -> void:
 	_record_and_save()
 
 func _on_canvas_tile_painted(cell: Vector2i, terrain: String) -> void:
-	_apply_tile_change(cell, terrain)
+	_apply_tile_change(cell, terrain, selected_layer)
 	_request_save()
 	refresh_canvas()
 
@@ -357,7 +383,7 @@ func refresh_object_list() -> void:
 		object_list.select(selected_index)
 
 func refresh_canvas() -> void:
-	canvas.set_scene_objects(scene_objects, selected_object_id, tile_cells, tool_mode, selected_terrain)
+	canvas.set_scene_objects(scene_objects, selected_object_id, tile_cells, tool_mode, selected_terrain, selected_layer)
 
 func refresh_inspector() -> void:
 	var object_index := _find_object_index(selected_object_id)
@@ -409,8 +435,8 @@ func _load_snapshot() -> void:
 	if not scene_objects.is_empty():
 		selected_object_id = String(scene_objects[0].get("id", ""))
 
-func _apply_tile_change(cell: Vector2i, terrain: String) -> void:
-	var tile_index := _find_tile_index(cell)
+func _apply_tile_change(cell: Vector2i, terrain: String, layer: String = "ground") -> void:
+	var tile_index := _find_tile_index(cell, layer)
 	if terrain == "erase":
 		if tile_index != -1:
 			tile_cells.remove_at(tile_index)
@@ -420,14 +446,15 @@ func _apply_tile_change(cell: Vector2i, terrain: String) -> void:
 		"x": cell.x,
 		"y": cell.y,
 		"terrain": terrain,
+		"layer": layer,
 	}
 	if tile_index == -1:
 		tile_cells.append(entry)
 	else:
 		tile_cells[tile_index] = entry
 
-func _find_tile_index(cell: Vector2i) -> int:
+func _find_tile_index(cell: Vector2i, layer: String = "ground") -> int:
 	for index in tile_cells.size():
-		if int(tile_cells[index].get("x", -1)) == cell.x and int(tile_cells[index].get("y", -1)) == cell.y:
+		if int(tile_cells[index].get("x", -1)) == cell.x and int(tile_cells[index].get("y", -1)) == cell.y and String(tile_cells[index].get("layer", "ground")) == layer:
 			return index
 	return -1

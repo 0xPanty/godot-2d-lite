@@ -7,6 +7,9 @@ const TERRAIN_COLORS := {
 	"ground": Color("334155"),
 	"wall": Color("475569"),
 	"water": Color("1d4ed8"),
+	"grass": Color("166534"),
+	"sand": Color("a16207"),
+	"path": Color("78716c"),
 }
 
 var scene_objects: Array[Dictionary] = []
