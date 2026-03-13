@@ -1,7 +1,7 @@
 .godot/
 .import/
 *.import
-export_presets.cfg
+.godot/export_credentials.cfg
 user/
 *.tmp
 .DS_Store
