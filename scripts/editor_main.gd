@@ -3,6 +3,7 @@ extends Control
 const LogicTemplatesScript = preload("res://scripts/logic_templates.gd")
 const ProjectStoreScript = preload("res://scripts/project_store.gd")
 const UndoRedoScript = preload("res://scripts/undo_redo_manager.gd")
+const AIClientScript = preload("res://scripts/ai_client.gd")
 const OBJECT_TYPES := ["player", "npc", "door", "chest", "trigger", "prop"]
 const TRIGGER_MODES := ["interact", "touch", "area", "auto"]
 const TILE_LAYERS := ["ground", "decoration", "collision"]
@@ -19,6 +20,9 @@ var selected_terrain := "ground"
 var selected_layer := "ground"
 var _undo_redo: RefCounted
 var _save_timer: Timer
+var _ai_client: Node
+var _ai_available := false
+var _ai_pending_object_index := -1
 
 @onready var resource_list: ItemList = $MainSplit/LeftPanel/ResourceList
 @onready var object_list: ItemList = $MainSplit/LeftPanel/ObjectList
@@ -38,6 +42,7 @@ var _save_timer: Timer
 func _ready() -> void:
 	_undo_redo = UndoRedoScript.new()
 	_setup_save_timer()
+	_setup_ai_client()
 	_setup_options()
 	_setup_dialog()
 	_bind_events()
@@ -47,6 +52,13 @@ func _ready() -> void:
 	refresh_all()
 	_push_undo_state()
 	append_log("Lite2D Studio 已启动。Ctrl+Z 撤销，Ctrl+Y 重做。")
+
+func _setup_ai_client() -> void:
+	_ai_client = AIClientScript.new()
+	add_child(_ai_client)
+	_ai_client.response_received.connect(_on_ai_response)
+	_ai_client.error_occurred.connect(_on_ai_error)
+	_ai_client.check_health()
 
 func _setup_save_timer() -> void:
 	_save_timer = Timer.new()
@@ -332,17 +344,72 @@ func _on_apply_ai_pressed() -> void:
 		append_log("请先选择对象，再让 AI 帮你补逻辑。")
 		return
 
+	if _ai_available:
+		_ai_pending_object_index = object_index
+		append_log("正在请求 AI 生成逻辑...")
+		_ai_client.generate_game_logic(prompt, scene_objects[object_index])
+		prompt_input.clear()
+	else:
+		_apply_template_fallback(prompt, object_index)
+
+func _apply_template_fallback(prompt: String, object_index: int) -> void:
 	var result: Dictionary = LogicTemplatesScript.apply_prompt(prompt, scene_objects[object_index])
 	var updates: Dictionary = result.get("updates", {})
 	for key in updates.keys():
 		_apply_update(scene_objects[object_index], String(key), updates[key])
 	for note in result.get("notes", []):
 		append_log(String(note))
-
 	refresh_all()
 	_record_and_save()
 	prompt_input.clear()
-	append_log("AI 指令已应用到对象: %s" % scene_objects[object_index]["name"])
+	append_log("模板指令已应用到对象: %s（AI 不可用，使用内置模板）" % scene_objects[object_index]["name"])
+
+func _on_ai_response(result: Dictionary) -> void:
+	var content := String(result.get("content", ""))
+	if content.is_empty():
+		if result.has("status"):
+			_ai_available = true
+			append_log("AI 服务已连接 (%s)。" % _ai_client.model)
+		return
+
+	if _ai_pending_object_index == -1 or _ai_pending_object_index >= scene_objects.size():
+		append_log("AI 返回了结果，但目标对象已不存在。")
+		_ai_pending_object_index = -1
+		return
+
+	var json := JSON.new()
+	if json.parse(content) != OK:
+		append_log("AI 返回内容不是有效 JSON，回退到模板模式。")
+		append_log("AI 原始回复: %s" % content.substr(0, 200))
+		_ai_pending_object_index = -1
+		return
+
+	var parsed: Dictionary = json.data
+	var updates: Dictionary = parsed.get("updates", {})
+	var notes: Array = parsed.get("notes", [])
+
+	for key in updates.keys():
+		_apply_update(scene_objects[_ai_pending_object_index], String(key), updates[key])
+	for note in notes:
+		append_log(String(note))
+
+	refresh_all()
+	_record_and_save()
+	append_log("AI 逻辑已应用到对象: %s" % scene_objects[_ai_pending_object_index]["name"])
+	_ai_pending_object_index = -1
+
+func _on_ai_error(error_message: String) -> void:
+	if not _ai_available:
+		_ai_available = false
+		append_log("AI 不可用: %s（将使用内置模板模式）" % error_message)
+	else:
+		append_log("AI 请求失败: %s" % error_message)
+		if _ai_pending_object_index != -1:
+			append_log("回退到模板模式...")
+			var prompt := prompt_input.text.strip_edges()
+			if not prompt.is_empty() and _ai_pending_object_index < scene_objects.size():
+				_apply_template_fallback(prompt, _ai_pending_object_index)
+			_ai_pending_object_index = -1
 
 func _apply_update(target: Dictionary, path: String, value: Variant) -> void:
 	var parts := path.split("/")
