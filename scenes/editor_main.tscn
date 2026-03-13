@@ -1,0 +1,232 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://scripts/editor_main.gd" id="1_1"]
+[ext_resource type="Script" path="res://scripts/scene_canvas.gd" id="2_2"]
+
+[node name="EditorMain" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_1")
+
+[node name="MainSplit" type="HSplitContainer" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+split_offset = 280
+
+[node name="LeftPanel" type="VBoxContainer" parent="MainSplit"]
+custom_minimum_size = Vector2(280, 0)
+layout_mode = 2
+
+[node name="ResourcesTitle" type="Label" parent="MainSplit/LeftPanel"]
+layout_mode = 2
+text = "素材资源"
+
+[node name="ImportButton" type="Button" parent="MainSplit/LeftPanel"]
+layout_mode = 2
+text = "导入素材"
+
+[node name="ResourceList" type="ItemList" parent="MainSplit/LeftPanel"]
+custom_minimum_size = Vector2(0, 240)
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="ObjectsTitle" type="Label" parent="MainSplit/LeftPanel"]
+layout_mode = 2
+text = "场景对象"
+
+[node name="ObjectList" type="ItemList" parent="MainSplit/LeftPanel"]
+custom_minimum_size = Vector2(0, 240)
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="CenterPanel" type="VBoxContainer" parent="MainSplit"]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="Toolbar" type="HBoxContainer" parent="MainSplit/CenterPanel"]
+layout_mode = 2
+
+[node name="SelectToolButton" type="Button" parent="MainSplit/CenterPanel/Toolbar"]
+layout_mode = 2
+text = "选择"
+
+[node name="GroundToolButton" type="Button" parent="MainSplit/CenterPanel/Toolbar"]
+layout_mode = 2
+text = "地面"
+
+[node name="WallToolButton" type="Button" parent="MainSplit/CenterPanel/Toolbar"]
+layout_mode = 2
+text = "墙体"
+
+[node name="WaterToolButton" type="Button" parent="MainSplit/CenterPanel/Toolbar"]
+layout_mode = 2
+text = "水域"
+
+[node name="EraseToolButton" type="Button" parent="MainSplit/CenterPanel/Toolbar"]
+layout_mode = 2
+text = "擦除"
+
+[node name="AddPlayerButton" type="Button" parent="MainSplit/CenterPanel/Toolbar"]
+layout_mode = 2
+text = "主角"
+
+[node name="AddNPCButton" type="Button" parent="MainSplit/CenterPanel/Toolbar"]
+layout_mode = 2
+text = "NPC"
+
+[node name="AddDoorButton" type="Button" parent="MainSplit/CenterPanel/Toolbar"]
+layout_mode = 2
+text = "门"
+
+[node name="AddChestButton" type="Button" parent="MainSplit/CenterPanel/Toolbar"]
+layout_mode = 2
+text = "宝箱"
+
+[node name="AddTriggerButton" type="Button" parent="MainSplit/CenterPanel/Toolbar"]
+layout_mode = 2
+text = "触发区"
+
+[node name="PreviewButton" type="Button" parent="MainSplit/CenterPanel/Toolbar"]
+layout_mode = 2
+text = "运行预览"
+
+[node name="DeleteButton" type="Button" parent="MainSplit/CenterPanel/Toolbar"]
+layout_mode = 2
+text = "删除对象"
+
+[node name="CanvasPanel" type="PanelContainer" parent="MainSplit/CenterPanel"]
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="SceneCanvas" type="Control" parent="MainSplit/CenterPanel/CanvasPanel"]
+custom_minimum_size = Vector2(960, 640)
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+script = ExtResource("2_2")
+
+[node name="LogOutput" type="RichTextLabel" parent="MainSplit/CenterPanel"]
+custom_minimum_size = Vector2(0, 180)
+layout_mode = 2
+bbcode_enabled = true
+scroll_following = true
+
+[node name="RightPanel" type="VBoxContainer" parent="MainSplit"]
+custom_minimum_size = Vector2(340, 0)
+layout_mode = 2
+
+[node name="InspectorTitle" type="Label" parent="MainSplit/RightPanel"]
+layout_mode = 2
+text = "属性面板"
+
+[node name="Inspector" type="VBoxContainer" parent="MainSplit/RightPanel"]
+layout_mode = 2
+
+[node name="NameLabel" type="Label" parent="MainSplit/RightPanel/Inspector"]
+layout_mode = 2
+text = "名称"
+
+[node name="NameEdit" type="LineEdit" parent="MainSplit/RightPanel/Inspector"]
+layout_mode = 2
+
+[node name="TypeLabel" type="Label" parent="MainSplit/RightPanel/Inspector"]
+layout_mode = 2
+text = "类型"
+
+[node name="TypeOption" type="OptionButton" parent="MainSplit/RightPanel/Inspector"]
+layout_mode = 2
+
+[node name="PositionLabel" type="Label" parent="MainSplit/RightPanel/Inspector"]
+layout_mode = 2
+text = "位置"
+
+[node name="PositionRow" type="HBoxContainer" parent="MainSplit/RightPanel/Inspector"]
+layout_mode = 2
+
+[node name="PosXSpin" type="SpinBox" parent="MainSplit/RightPanel/Inspector/PositionRow"]
+layout_mode = 2
+max_value = 4096.0
+step = 32.0
+prefix = "X "
+
+[node name="PosYSpin" type="SpinBox" parent="MainSplit/RightPanel/Inspector/PositionRow"]
+layout_mode = 2
+max_value = 4096.0
+step = 32.0
+prefix = "Y "
+
+[node name="SolidCheck" type="CheckBox" parent="MainSplit/RightPanel/Inspector"]
+layout_mode = 2
+text = "参与碰撞"
+
+[node name="InteractCheck" type="CheckBox" parent="MainSplit/RightPanel/Inspector"]
+layout_mode = 2
+text = "可交互"
+
+[node name="TriggerLabel" type="Label" parent="MainSplit/RightPanel/Inspector"]
+layout_mode = 2
+text = "触发方式"
+
+[node name="TriggerOption" type="OptionButton" parent="MainSplit/RightPanel/Inspector"]
+layout_mode = 2
+
+[node name="DialogueLabel" type="Label" parent="MainSplit/RightPanel/Inspector"]
+layout_mode = 2
+text = "对话/备注"
+
+[node name="DialogueEdit" type="TextEdit" parent="MainSplit/RightPanel/Inspector"]
+custom_minimum_size = Vector2(0, 110)
+layout_mode = 2
+
+[node name="ApplyInspectorButton" type="Button" parent="MainSplit/RightPanel/Inspector"]
+layout_mode = 2
+text = "应用属性"
+
+[node name="AIPanelTitle" type="Label" parent="MainSplit/RightPanel"]
+layout_mode = 2
+text = "AI 指令"
+
+[node name="AIPanel" type="VBoxContainer" parent="MainSplit/RightPanel"]
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="PromptInput" type="TextEdit" parent="MainSplit/RightPanel/AIPanel"]
+custom_minimum_size = Vector2(0, 220)
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="ApplyAIButton" type="Button" parent="MainSplit/RightPanel/AIPanel"]
+layout_mode = 2
+text = "让 AI 帮我补逻辑"
+
+[node name="HintLabel" type="Label" parent="MainSplit/RightPanel/AIPanel"]
+layout_mode = 2
+text = "示例：\n让这个 NPC 点击后对话\n让这个门碰到后切场景\n让主角可以移动并镜头跟随"
+
+[node name="FileDialog" type="FileDialog" parent="."]
+title = "导入素材"
+size = Vector2i(900, 560)
+
+[connection signal="pressed" from="MainSplit/LeftPanel/ImportButton" to="." method="_on_import_pressed"]
+[connection signal="pressed" from="MainSplit/CenterPanel/Toolbar/SelectToolButton" to="." method="_on_select_tool_pressed"]
+[connection signal="pressed" from="MainSplit/CenterPanel/Toolbar/GroundToolButton" to="." method="_on_ground_tool_pressed"]
+[connection signal="pressed" from="MainSplit/CenterPanel/Toolbar/WallToolButton" to="." method="_on_wall_tool_pressed"]
+[connection signal="pressed" from="MainSplit/CenterPanel/Toolbar/WaterToolButton" to="." method="_on_water_tool_pressed"]
+[connection signal="pressed" from="MainSplit/CenterPanel/Toolbar/EraseToolButton" to="." method="_on_erase_tool_pressed"]
+[connection signal="pressed" from="MainSplit/CenterPanel/Toolbar/AddPlayerButton" to="." method="_on_add_player_pressed"]
+[connection signal="pressed" from="MainSplit/CenterPanel/Toolbar/AddNPCButton" to="." method="_on_add_npc_pressed"]
+[connection signal="pressed" from="MainSplit/CenterPanel/Toolbar/AddDoorButton" to="." method="_on_add_door_pressed"]
+[connection signal="pressed" from="MainSplit/CenterPanel/Toolbar/AddChestButton" to="." method="_on_add_chest_pressed"]
+[connection signal="pressed" from="MainSplit/CenterPanel/Toolbar/AddTriggerButton" to="." method="_on_add_trigger_pressed"]
+[connection signal="pressed" from="MainSplit/CenterPanel/Toolbar/PreviewButton" to="." method="_on_preview_pressed"]
+[connection signal="pressed" from="MainSplit/CenterPanel/Toolbar/DeleteButton" to="." method="_on_delete_selected_pressed"]
+[connection signal="pressed" from="MainSplit/RightPanel/Inspector/ApplyInspectorButton" to="." method="_on_apply_inspector_pressed"]
+[connection signal="pressed" from="MainSplit/RightPanel/AIPanel/ApplyAIButton" to="." method="_on_apply_ai_pressed"]
