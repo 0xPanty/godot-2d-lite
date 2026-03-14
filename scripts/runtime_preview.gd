@@ -1,6 +1,7 @@
 extends Node2D
 
 const ProjectStoreScript = preload("res://scripts/project_store.gd")
+const EventRunnerScript = preload("res://scripts/event_runner.gd")
 const GRID_SIZE := 32.0
 const INTERACT_DISTANCE := 84.0
 const TERRAIN_COLORS := {
@@ -20,6 +21,7 @@ var player_data: Dictionary = {}
 var active_interactable_id := ""
 var consumed_object_ids := {}
 var _world_ground: Node2D
+var _event_runner: Node
 
 @onready var world: Node2D = $World
 @onready var title_label: Label = $UI/Panel/Margin/VBox/TitleLabel
@@ -31,12 +33,44 @@ func _ready() -> void:
 	scene_objects = snapshot.get("scene_objects", [])
 	tile_cells = snapshot.get("tile_cells", [])
 	_build_world()
+	_setup_event_runner(snapshot.get("events", []))
 	_update_header()
 	_show_message("运行预览已启动。方向键移动，E 键交互，右上角可返回编辑器。")
 
-func _physics_process(_delta: float) -> void:
+func _setup_event_runner(event_data: Array) -> void:
+	_event_runner = EventRunnerScript.new()
+	add_child(_event_runner)
+	var typed_events: Array[Dictionary] = []
+	for evt in event_data:
+		if evt is Dictionary:
+			typed_events.append(evt)
+	_event_runner.load_events(typed_events)
+	_event_runner.set_runtime_refs(runtime_nodes, player_body)
+	_event_runner.dialogue_requested.connect(_on_event_dialogue)
+	_event_runner.scene_change_requested.connect(_on_event_scene_change)
+	_event_runner.object_spawn_requested.connect(_on_event_spawn)
+
+func _on_event_dialogue(object_id: String, text: String) -> void:
+	var obj_name := "系统"
+	if runtime_nodes.has(object_id):
+		obj_name = String(runtime_nodes[object_id].get("data", {}).get("name", object_id))
+	_show_message("%s：%s" % [obj_name, text])
+
+func _on_event_scene_change(scene_path: String) -> void:
+	_show_message("切换场景: %s" % scene_path)
+	get_tree().change_scene_to_file(scene_path)
+
+func _on_event_spawn(object_type: String, pos: Vector2) -> void:
+	var obj_data := ProjectStoreScript.default_object(object_type, randi() % 10000)
+	obj_data["position"] = pos
+	_create_world_object(obj_data)
+	_show_message("生成了 %s" % object_type)
+
+func _physics_process(delta: float) -> void:
 	_update_player_movement()
 	_update_interaction_hint()
+	if _event_runner:
+		_event_runner.process_events(delta)
 
 func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventKey and event.pressed and not event.echo:

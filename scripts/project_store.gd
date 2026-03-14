@@ -27,49 +27,43 @@ static func default_object(object_type: String, object_index: int, resource_path
 		"behaviors": behaviors,
 	}
 
-static func save_snapshot(resources: Array[Dictionary], scene_objects: Array[Dictionary], next_object_id: int, tile_cells: Array[Dictionary] = []) -> void:
+static func save_snapshot(resources: Array[Dictionary], scene_objects: Array[Dictionary], next_object_id: int, tile_cells: Array[Dictionary] = [], events: Array[Dictionary] = []) -> void:
 	var payload := {
 		"resources": _serialize_resources(resources),
 		"scene_objects": _serialize_scene_objects(scene_objects),
 		"next_object_id": next_object_id,
 		"tile_cells": _serialize_tile_cells(tile_cells),
+		"events": events.duplicate(true),
 	}
 	var file := FileAccess.open(SNAPSHOT_PATH, FileAccess.WRITE)
 	if file:
 		file.store_string(JSON.stringify(payload, "  "))
 
 static func load_snapshot() -> Dictionary:
+	var empty := {
+		"resources": [],
+		"scene_objects": [],
+		"next_object_id": 1,
+		"tile_cells": [],
+		"events": [],
+	}
 	if not FileAccess.file_exists(SNAPSHOT_PATH):
-		return {
-			"resources": [],
-			"scene_objects": [],
-			"next_object_id": 1,
-			"tile_cells": [],
-		}
+		return empty
 
 	var file := FileAccess.open(SNAPSHOT_PATH, FileAccess.READ)
 	if not file:
-		return {
-			"resources": [],
-			"scene_objects": [],
-			"next_object_id": 1,
-			"tile_cells": [],
-		}
+		return empty
 
 	var parsed: Variant = JSON.parse_string(file.get_as_text())
 	if typeof(parsed) != TYPE_DICTIONARY:
-		return {
-			"resources": [],
-			"scene_objects": [],
-			"next_object_id": 1,
-			"tile_cells": [],
-		}
+		return empty
 
 	return {
 		"resources": _deserialize_resources(parsed.get("resources", [])),
 		"scene_objects": _deserialize_scene_objects(parsed.get("scene_objects", [])),
 		"next_object_id": int(parsed.get("next_object_id", 1)),
 		"tile_cells": _deserialize_tile_cells(parsed.get("tile_cells", [])),
+		"events": parsed.get("events", []),
 	}
 
 static func _serialize_resources(resources: Array[Dictionary]) -> Array[Dictionary]:

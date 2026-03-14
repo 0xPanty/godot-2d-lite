@@ -4,6 +4,7 @@ const LogicTemplatesScript = preload("res://scripts/logic_templates.gd")
 const ProjectStoreScript = preload("res://scripts/project_store.gd")
 const UndoRedoScript = preload("res://scripts/undo_redo_manager.gd")
 const AIClientScript = preload("res://scripts/ai_client.gd")
+const EventSystemScript = preload("res://scripts/event_system.gd")
 const OBJECT_TYPES := ["player", "npc", "door", "chest", "trigger", "prop"]
 const TRIGGER_MODES := ["interact", "touch", "area", "auto"]
 const TILE_LAYERS := ["ground", "decoration", "collision"]
@@ -12,6 +13,7 @@ const SAVE_DEBOUNCE_SEC := 1.5
 var resources: Array[Dictionary] = []
 var scene_objects: Array[Dictionary] = []
 var tile_cells: Array[Dictionary] = []
+var events: Array[Dictionary] = []
 var selected_resource_index := -1
 var selected_object_id := ""
 var _next_object_id := 1
@@ -27,7 +29,8 @@ var _ai_pending_object_index := -1
 @onready var resource_list: ItemList = $MainSplit/LeftPanel/ResourceList
 @onready var object_list: ItemList = $MainSplit/LeftPanel/ObjectList
 @onready var canvas = $MainSplit/CenterPanel/CanvasPanel/SceneCanvas
-@onready var log_output: RichTextLabel = $MainSplit/CenterPanel/LogOutput
+@onready var log_output: RichTextLabel = $"MainSplit/CenterPanel/BottomTabs/日志"
+@onready var event_editor = $"MainSplit/CenterPanel/BottomTabs/事件编辑器"
 @onready var file_dialog: FileDialog = $FileDialog
 @onready var name_edit: LineEdit = $MainSplit/RightPanel/Inspector/NameEdit
 @onready var type_option: OptionButton = $MainSplit/RightPanel/Inspector/TypeOption
@@ -86,6 +89,7 @@ func _bind_events() -> void:
 	canvas.tile_painted.connect(_on_canvas_tile_painted)
 	canvas.tile_paint_ended.connect(_on_canvas_tile_paint_ended)
 	file_dialog.files_selected.connect(_on_files_selected)
+	event_editor.events_changed.connect(_on_events_changed)
 
 func _unhandled_key_input(event: InputEvent) -> void:
 	if not event is InputEventKey or not event.pressed or event.echo:
@@ -130,10 +134,14 @@ func _capture_state() -> Dictionary:
 	var tiles_copy: Array[Dictionary] = []
 	for tile in tile_cells:
 		tiles_copy.append(tile.duplicate(true))
+	var events_copy: Array[Dictionary] = []
+	for evt in events:
+		events_copy.append(evt.duplicate(true))
 	return {
 		"resources": resources_copy,
 		"scene_objects": objects_copy,
 		"tile_cells": tiles_copy,
+		"events": events_copy,
 		"next_object_id": _next_object_id,
 		"selected_object_id": selected_object_id,
 	}
@@ -148,6 +156,9 @@ func _restore_state(state: Dictionary) -> void:
 	tile_cells = []
 	for tile in state.get("tile_cells", []):
 		tile_cells.append(tile.duplicate(true))
+	events = []
+	for evt in state.get("events", []):
+		events.append(evt.duplicate(true))
 	_next_object_id = int(state.get("next_object_id", 1))
 	selected_object_id = String(state.get("selected_object_id", ""))
 
@@ -155,7 +166,7 @@ func _request_save() -> void:
 	_save_timer.start()
 
 func _do_save_snapshot() -> void:
-	ProjectStoreScript.save_snapshot(resources, scene_objects, _next_object_id, tile_cells)
+	ProjectStoreScript.save_snapshot(resources, scene_objects, _next_object_id, tile_cells, events)
 
 func _record_and_save() -> void:
 	_push_undo_state()
@@ -425,11 +436,23 @@ func _apply_update(target: Dictionary, path: String, value: Variant) -> void:
 		current = current[part]
 	current[parts[parts.size() - 1]] = value
 
+func _on_events_changed(new_events: Array[Dictionary]) -> void:
+	events = new_events
+	_record_and_save()
+	append_log("事件已更新，共 %d 条。" % events.size())
+
+func _refresh_event_editor() -> void:
+	var names: Dictionary = {}
+	for obj in scene_objects:
+		names[String(obj.get("id", ""))] = String(obj.get("name", ""))
+	event_editor.set_events(events, names)
+
 func refresh_all() -> void:
 	refresh_resource_list()
 	refresh_object_list()
 	refresh_canvas()
 	refresh_inspector()
+	_refresh_event_editor()
 
 func refresh_resource_list() -> void:
 	resource_list.clear()
@@ -499,6 +522,9 @@ func _load_snapshot() -> void:
 	scene_objects = snapshot.get("scene_objects", [])
 	_next_object_id = int(snapshot.get("next_object_id", 1))
 	tile_cells = snapshot.get("tile_cells", [])
+	events = []
+	for evt in snapshot.get("events", []):
+		events.append(evt)
 	if not scene_objects.is_empty():
 		selected_object_id = String(scene_objects[0].get("id", ""))
 

@@ -1,7 +1,8 @@
-[gd_scene load_steps=3 format=3]
+[gd_scene load_steps=4 format=3]
 
 [ext_resource type="Script" path="res://scripts/editor_main.gd" id="1_1"]
 [ext_resource type="Script" path="res://scripts/scene_canvas.gd" id="2_2"]
+[ext_resource type="Script" path="res://scripts/event_editor_panel.gd" id="3_3"]
 
 [node name="EditorMain" type="Control"]
 layout_mode = 3
@@ -125,11 +126,67 @@ size_flags_horizontal = 3
 size_flags_vertical = 3
 script = ExtResource("2_2")
 
-[node name="LogOutput" type="RichTextLabel" parent="MainSplit/CenterPanel"]
-custom_minimum_size = Vector2(0, 180)
+[node name="BottomTabs" type="TabContainer" parent="MainSplit/CenterPanel"]
+custom_minimum_size = Vector2(0, 240)
+layout_mode = 2
+size_flags_vertical = 3
+size_flags_stretch_ratio = 0.4
+
+[node name="日志" type="RichTextLabel" parent="MainSplit/CenterPanel/BottomTabs"]
 layout_mode = 2
 bbcode_enabled = true
 scroll_following = true
+
+[node name="事件编辑器" type="VBoxContainer" parent="MainSplit/CenterPanel/BottomTabs"]
+layout_mode = 2
+script = ExtResource("3_3")
+
+[node name="Toolbar" type="HBoxContainer" parent="MainSplit/CenterPanel/BottomTabs/事件编辑器"]
+custom_minimum_size = Vector2(0, 32)
+layout_mode = 2
+
+[node name="TitleLabel" type="Label" parent="MainSplit/CenterPanel/BottomTabs/事件编辑器/Toolbar"]
+layout_mode = 2
+text = "事件编辑器"
+theme_override_font_sizes/font_size = 14
+
+[node name="HSeparator" type="HSeparator" parent="MainSplit/CenterPanel/BottomTabs/事件编辑器/Toolbar"]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="AddEventBtn" type="Button" parent="MainSplit/CenterPanel/BottomTabs/事件编辑器/Toolbar"]
+custom_minimum_size = Vector2(80, 0)
+layout_mode = 2
+text = "+ 事件"
+
+[node name="DeleteEventBtn" type="Button" parent="MainSplit/CenterPanel/BottomTabs/事件编辑器/Toolbar"]
+custom_minimum_size = Vector2(60, 0)
+layout_mode = 2
+text = "删除"
+
+[node name="DuplicateEventBtn" type="Button" parent="MainSplit/CenterPanel/BottomTabs/事件编辑器/Toolbar"]
+custom_minimum_size = Vector2(60, 0)
+layout_mode = 2
+text = "复制"
+
+[node name="MoveUpBtn" type="Button" parent="MainSplit/CenterPanel/BottomTabs/事件编辑器/Toolbar"]
+custom_minimum_size = Vector2(40, 0)
+layout_mode = 2
+text = "↑"
+
+[node name="MoveDownBtn" type="Button" parent="MainSplit/CenterPanel/BottomTabs/事件编辑器/Toolbar"]
+custom_minimum_size = Vector2(40, 0)
+layout_mode = 2
+text = "↓"
+
+[node name="EventScroll" type="ScrollContainer" parent="MainSplit/CenterPanel/BottomTabs/事件编辑器"]
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="EventListContainer" type="VBoxContainer" parent="MainSplit/CenterPanel/BottomTabs/事件编辑器/EventScroll"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
 
 [node name="RightPanel" type="VBoxContainer" parent="MainSplit"]
 custom_minimum_size = Vector2(340, 0)
