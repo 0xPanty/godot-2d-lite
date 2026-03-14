@@ -5,6 +5,7 @@ const ProjectStoreScript = preload("res://scripts/project_store.gd")
 const UndoRedoScript = preload("res://scripts/undo_redo_manager.gd")
 const AIClientScript = preload("res://scripts/ai_client.gd")
 const EventSystemScript = preload("res://scripts/event_system.gd")
+const BehaviorSystemScript = preload("res://scripts/behavior_system.gd")
 const OBJECT_TYPES := ["player", "npc", "door", "chest", "trigger", "prop"]
 const TRIGGER_MODES := ["interact", "touch", "area", "auto"]
 const TILE_LAYERS := ["ground", "decoration", "collision"]
@@ -41,6 +42,7 @@ var _ai_pending_object_index := -1
 @onready var trigger_option: OptionButton = $MainSplit/RightPanel/Inspector/TriggerOption
 @onready var dialogue_edit: TextEdit = $MainSplit/RightPanel/Inspector/DialogueEdit
 @onready var prompt_input: TextEdit = $MainSplit/RightPanel/AIPanel/PromptInput
+@onready var behavior_container: VBoxContainer = $MainSplit/RightPanel/Inspector/BehaviorContainer
 
 func _ready() -> void:
 	_undo_redo = UndoRedoScript.new()
@@ -487,6 +489,8 @@ func refresh_inspector() -> void:
 	trigger_option.disabled = not has_object
 	dialogue_edit.editable = has_object
 
+	_refresh_behavior_ui(object_index if has_object else -1)
+
 	if not has_object:
 		name_edit.text = ""
 		dialogue_edit.text = ""
@@ -551,3 +555,73 @@ func _find_tile_index(cell: Vector2i, layer: String = "ground") -> int:
 		if int(tile_cells[index].get("x", -1)) == cell.x and int(tile_cells[index].get("y", -1)) == cell.y and String(tile_cells[index].get("layer", "ground")) == layer:
 			return index
 	return -1
+
+# --- Behavior UI ---
+
+func _refresh_behavior_ui(object_index: int) -> void:
+	for child in behavior_container.get_children():
+		child.queue_free()
+
+	if object_index == -1:
+		return
+
+	var obj := scene_objects[object_index]
+	var attached: Array = obj.get("attached_behaviors", [])
+
+	for bi in attached.size():
+		var beh: Dictionary = attached[bi]
+		var btype := int(beh.get("behavior_type", 0))
+		var info := BehaviorSystemScript.get_by_type(btype as BehaviorSystemScript.BehaviorType)
+		var row := HBoxContainer.new()
+		var color_rect := ColorRect.new()
+		color_rect.color = info.get("color", Color.WHITE)
+		color_rect.custom_minimum_size = Vector2(12, 12)
+		row.add_child(color_rect)
+		var label := Label.new()
+		label.text = "%s" % info.get("name", "未知")
+		label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		row.add_child(label)
+		var remove_btn := Button.new()
+		remove_btn.text = "✕"
+		remove_btn.custom_minimum_size.x = 28
+		var bi_ref := bi
+		remove_btn.pressed.connect(func():
+			_remove_behavior(object_index, bi_ref)
+		)
+		row.add_child(remove_btn)
+		behavior_container.add_child(row)
+
+	var add_btn := MenuButton.new()
+	add_btn.text = "+ 添加行为"
+	add_btn.flat = false
+	var popup := add_btn.get_popup()
+	var catalog := BehaviorSystemScript.get_catalog()
+	for ci in catalog.size():
+		popup.add_item("%s — %s" % [catalog[ci].get("name", ""), catalog[ci].get("description", "")], ci)
+	popup.id_pressed.connect(func(id: int):
+		_add_behavior(object_index, int(catalog[id].get("type", 0)))
+	)
+	behavior_container.add_child(add_btn)
+
+func _add_behavior(object_index: int, btype: int) -> void:
+	if object_index < 0 or object_index >= scene_objects.size():
+		return
+	var beh := BehaviorSystemScript.create_behavior_data(btype as BehaviorSystemScript.BehaviorType)
+	if not scene_objects[object_index].has("attached_behaviors"):
+		scene_objects[object_index]["attached_behaviors"] = []
+	scene_objects[object_index]["attached_behaviors"].append(beh)
+	refresh_inspector()
+	_record_and_save()
+	append_log("已添加行为: %s" % BehaviorSystemScript.behavior_label(btype))
+
+func _remove_behavior(object_index: int, behavior_index: int) -> void:
+	if object_index < 0 or object_index >= scene_objects.size():
+		return
+	var attached: Array = scene_objects[object_index].get("attached_behaviors", [])
+	if behavior_index < 0 or behavior_index >= attached.size():
+		return
+	var removed_name := BehaviorSystemScript.behavior_label(int(attached[behavior_index].get("behavior_type", 0)))
+	attached.remove_at(behavior_index)
+	refresh_inspector()
+	_record_and_save()
+	append_log("已移除行为: %s" % removed_name)

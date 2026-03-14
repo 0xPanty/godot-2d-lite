@@ -2,6 +2,8 @@ extends Node2D
 
 const ProjectStoreScript = preload("res://scripts/project_store.gd")
 const EventRunnerScript = preload("res://scripts/event_runner.gd")
+const BehaviorRunnerScript = preload("res://scripts/behavior_runner.gd")
+const BehaviorSystemScript = preload("res://scripts/behavior_system.gd")
 const GRID_SIZE := 32.0
 const INTERACT_DISTANCE := 84.0
 const TERRAIN_COLORS := {
@@ -22,6 +24,7 @@ var active_interactable_id := ""
 var consumed_object_ids := {}
 var _world_ground: Node2D
 var _event_runner: Node
+var _behavior_runner: RefCounted
 
 @onready var world: Node2D = $World
 @onready var title_label: Label = $UI/Panel/Margin/VBox/TitleLabel
@@ -33,9 +36,23 @@ func _ready() -> void:
 	scene_objects = snapshot.get("scene_objects", [])
 	tile_cells = snapshot.get("tile_cells", [])
 	_build_world()
+	_setup_behavior_runner()
 	_setup_event_runner(snapshot.get("events", []))
 	_update_header()
 	_show_message("运行预览已启动。方向键移动，E 键交互，右上角可返回编辑器。")
+
+func _setup_behavior_runner() -> void:
+	_behavior_runner = BehaviorRunnerScript.new()
+	for object_id in runtime_nodes.keys():
+		var entry: Dictionary = runtime_nodes[object_id]
+		var obj_data: Dictionary = entry.get("data", {})
+		var node: Node2D = entry.get("node")
+		if node == null:
+			continue
+		var attached: Array = obj_data.get("attached_behaviors", [])
+		for beh in attached:
+			if beh is Dictionary and bool(beh.get("enabled", true)):
+				_behavior_runner.register(node, beh, player_body)
 
 func _setup_event_runner(event_data: Array) -> void:
 	_event_runner = EventRunnerScript.new()
@@ -67,7 +84,10 @@ func _on_event_spawn(object_type: String, pos: Vector2) -> void:
 	_show_message("生成了 %s" % object_type)
 
 func _physics_process(delta: float) -> void:
-	_update_player_movement()
+	if _behavior_runner:
+		_behavior_runner.process_all(delta)
+	else:
+		_update_player_movement()
 	_update_interaction_hint()
 	if _event_runner:
 		_event_runner.process_events(delta)
