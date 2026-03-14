@@ -1,6 +1,6 @@
 # godot-2d-lite 当前状态
 
-最后同步阶段：`里程碑 1 完成 — MVP 可用版`
+最后同步阶段：`里程碑 2 进行中 — 核心系统搭建`
 
 ## 产品目标
 - 做一个基于 Godot 的 2D 轻量编辑器框架。
@@ -49,18 +49,27 @@
 ## 现在项目里有什么
 
 ### 脚本文件
-- `scripts/editor_main.gd`: 编辑器主逻辑（含 undo/redo、debounce、AI 集成、多图层）
+- `scripts/editor_main.gd`: 编辑器主逻辑（undo/redo、debounce、AI、多图层、事件、行为）
 - `scripts/scene_canvas.gd`: 画布交互 + 多图层地图绘制 + 性能优化
-- `scripts/runtime_preview.gd`: 运行时预览逻辑（Camera2D 修复版）
-- `scripts/project_store.gd`: 项目快照与数据存储（含图层兼容）
+- `scripts/runtime_preview.gd`: 运行时预览（事件执行、行为驱动、对话UI）
+- `scripts/project_store.gd`: 项目快照与数据存储（含事件、图层兼容）
 - `scripts/logic_templates.gd`: 内置 AI 逻辑模板（含优先级系统）
 - `scripts/undo_redo_manager.gd`: 撤销/重做管理器
 - `scripts/ai_client.gd`: AI 客户端（Ollama + OpenAI 双 Provider）
+- `scripts/event_system.gd`: 条件-动作事件数据模型（10条件+16动作）
+- `scripts/event_runner.gd`: 运行时事件执行引擎
+- `scripts/event_editor_panel.gd`: 可视化事件编辑器面板
+- `scripts/behavior_system.gd`: 行为预设目录（10种行为）
+- `scripts/behavior_runner.gd`: 运行时行为执行器
+- `scripts/dialogue_system.gd`: 多轮分支对话数据模型
+- `scripts/dialogue_ui.gd`: 运行时对话框 UI 控制器
 - `scripts/placeholder_target.gd`: 占位目标场景
 
 ### 场景文件
-- `scenes/editor_main.tscn`: 主编辑器（含装饰层按钮）
+- `scenes/editor_main.tscn`: 主编辑器（含事件编辑器Tab、行为面板）
 - `scenes/runtime_preview.tscn`: 运行预览
+- `scenes/dialogue_ui.tscn`: 对话框 UI
+- `scenes/event_editor_panel.tscn`: 事件编辑器面板
 - `scenes/placeholder_target.tscn`: 占位目标场景
 
 ### 工具
@@ -73,22 +82,46 @@
 ### 参考资料
 - `research-report.md`: 5 款竞品调研 + Godot 导出流程 + Ollama API 完整参考（未提交到 git）
 
-## 里程碑 2 方向（下一步）
+## 里程碑 2 已完成内容
+
+### 条件-动作事件系统
+- 10 种条件类型（碰撞、距离、按键、属性比较、旗标检查、定时器等）
+- 16 种动作类型（设置属性、显示对话、切换场景、生成对象、设置旗标、等待等）
+- GDevelop 风格的可视化事件编辑器（左侧条件、右侧动作、颜色区分）
+- 编辑器底部 Tab 切换（日志 / 事件编辑器）
+- 运行时事件执行引擎，支持子事件嵌套、旗标系统、定时器管理
+- 事件数据持久化到存档文件，支持 Undo/Redo
+
+### 行为(Behaviors)系统
+- 10 种行为预设：俯视角玩家、平台跳跃玩家、巡逻NPC、追逐NPC、逃跑NPC、静止障碍物、悬浮物体、投射物、跟随玩家、随机游走
+- 每种行为带颜色标记、分类、默认参数
+- 编辑器属性面板内行为管理（添加/移除/查看）
+- 运行时行为执行器，每种行为有独立状态机
+
+### 对话系统
+- 多节点对话树模型（文本/选择支/设置旗标/条件分支/结束）
+- 底部对话框 UI（说话人名字、富文本内容、选择按钮、继续提示）
+- 旗标驱动的条件分支对话
+- 构建辅助函数：build_linear() 线性对话、build_with_choice() 选择分支
+- NPC 交互时自动弹出对话 UI（替代之前的简单消息显示）
+
+## 里程碑 3 方向（下一步）
 
 ### 第一优先级
-1. 条件-动作事件编辑器（参考 GDevelop/Construct 3 的可视化事件表）
-2. 行为(Behaviors)系统（选一个行为=自动获得物理/寻路/平台跳跃）
-3. 对话系统增强（多轮对话、分支对话、NPC 头像）
+1. 背包/物品系统（物品定义表 + 拾取/使用逻辑）
+2. 任务系统原型（任务定义 + 条件触发 + 完成检测）
+3. 存档系统（运行时游戏存档/读档）
 
 ### 第二优先级
-4. 背包/物品系统（物品定义表 + 拾取/使用逻辑）
-5. 任务系统原型（任务定义 + 条件触发 + 完成检测）
-6. 存档系统（运行时游戏存档/读档）
+4. 动画系统（精灵帧动画编辑 + AnimationPlayer 封装）
+5. TileMap 正式化（用 Godot 原生 TileMap 节点，支持自动图块拼接）
+6. 多场景管理（场景列表、场景切换编辑）
 
 ### 第三优先级
 7. 多工作区编辑器布局（Tab 式，参考 GDevelop）
 8. 内置资源库/模板项目
 9. 游戏导出（让用户做的游戏也能打包发布）
+10. 插件商店（内置扩展下载机制）
 
 ## 调研报告中的关键设计建议
 

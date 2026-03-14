@@ -14,9 +14,9 @@
 4. **三层处理策略** — 默认值自动化 / 简化成人话开关 / AI 兜底处理边缘情况
 5. **保持跨平台**
 
-## 当前完成状态：里程碑 1
+## 当前完成状态：里程碑 1 + 里程碑 2 核心
 
-### 已完成功能清单
+### 里程碑 1 已完成
 - ✅ 编辑器主界面骨架（三栏布局）
 - ✅ 资源导入
 - ✅ 对象添加、删除、拖拽、属性编辑
@@ -29,16 +29,28 @@
 - ✅ CLI/API（10 个命令，JSON 输出）
 - ✅ 导出预设（Windows + Web）
 
+### 里程碑 2 已完成
+- ✅ 条件-动作事件系统（10条件+16动作，GDevelop风格可视化编辑器，运行时执行）
+- ✅ 行为系统（10种预设：俯视角/平台跳跃/巡逻/追逐/逃跑/悬浮/投射/跟随/游走）
+- ✅ 对话系统（多节点对话树、选择支、旗标条件分支、底部对话框UI）
+
 ### 关键文件
 | 文件 | 作用 |
 |------|------|
-| `scripts/editor_main.gd` | 编辑器主逻辑（undo/redo、debounce、AI 集成、多图层） |
+| `scripts/editor_main.gd` | 编辑器主逻辑（undo/redo、debounce、AI、多图层、事件、行为） |
 | `scripts/scene_canvas.gd` | 画布交互 + 多图层渲染 + 性能优化 |
-| `scripts/runtime_preview.gd` | 运行时预览（Camera2D 修复版） |
-| `scripts/project_store.gd` | 项目数据序列化/反序列化（含图层兼容） |
-| `scripts/logic_templates.gd` | 内置关键词模板（含优先级系统） |
-| `scripts/undo_redo_manager.gd` | 撤销/重做管理器 |
+| `scripts/runtime_preview.gd` | 运行时预览（事件执行、行为驱动、对话UI） |
+| `scripts/project_store.gd` | 项目数据序列化/反序列化（含事件、图层兼容） |
+| `scripts/event_system.gd` | 条件-动作事件数据模型（10条件+16动作） |
+| `scripts/event_runner.gd` | 运行时事件执行引擎（旗标、定时器、子事件） |
+| `scripts/event_editor_panel.gd` | GDevelop 风格可视化事件编辑器 |
+| `scripts/behavior_system.gd` | 行为预设目录（10种行为+默认参数+颜色标记） |
+| `scripts/behavior_runner.gd` | 运行时行为执行器（状态机驱动） |
+| `scripts/dialogue_system.gd` | 多轮分支对话数据模型 |
+| `scripts/dialogue_ui.gd` | 运行时对话框 UI（选择支、旗标分支） |
 | `scripts/ai_client.gd` | AI 客户端（Ollama + OpenAI） |
+| `scripts/logic_templates.gd` | 内置关键词模板（AI不可用时回退） |
+| `scripts/undo_redo_manager.gd` | 撤销/重做管理器 |
 | `tools/ai_cli_bridge.py` | CLI/API 桥接（10 个命令） |
 | `export_presets.cfg` | 导出预设 |
 | `research-report.md` | 竞品调研报告（5 款产品 + 导出流程 + Ollama API） |
@@ -46,11 +58,14 @@
 ## 架构
 
 ```
-编辑器层 (editor_main.gd + scene_canvas.gd)
-    ↓ 数据
+编辑器层 (editor_main.gd + scene_canvas.gd + event_editor_panel.gd)
+    ↓ 数据（对象 + 事件 + 行为 + 对话）
 数据层 (project_store.gd → user://editor_state.json)
     ↓ 读取
 运行预览层 (runtime_preview.gd)
+    ├── event_runner.gd     ← 条件-动作事件执行
+    ├── behavior_runner.gd  ← 行为状态机驱动
+    └── dialogue_ui.gd     ← 对话框交互
     
 AI 层 (ai_client.gd → Ollama/OpenAI)
     ↓ 回退
@@ -59,22 +74,23 @@ AI 层 (ai_client.gd → Ollama/OpenAI)
 CLI 层 (ai_cli_bridge.py → editor_state.json)
 ```
 
-## 里程碑 2 要做什么
+## 里程碑 3 要做什么
 
 ### 第一优先级
-1. **条件-动作事件编辑器** — 参考 GDevelop/Construct 3，用可视化条件-动作表替代纯文本。研报里有详细参考。
-2. **行为(Behaviors)系统** — 用户给对象选一个行为（如"平台角色"、"巡逻NPC"），自动配置物理和逻辑。
-3. **对话系统增强** — 多轮分支对话、NPC 头像显示。
+1. **背包/物品系统** — 物品定义表 + 拾取/使用逻辑 + UI 显示
+2. **任务系统原型** — 任务定义 + 条件触发 + 完成检测
+3. **存档系统** — 运行时游戏存档/读档
 
 ### 第二优先级
-4. 背包/物品系统
-5. 任务系统原型
-6. 存档系统
+4. 动画系统（精灵帧动画编辑 + AnimationPlayer 封装）
+5. TileMap 正式化（用 Godot 原生 TileMap 节点，支持自动图块拼接）
+6. 多场景管理（场景列表、场景切换编辑）
 
 ### 第三优先级
 7. 多工作区编辑器（Tab 式）
 8. 内置资源库
 9. 游戏导出（用户的游戏也能打包）
+10. 插件商店
 
 ## 调研报告摘要
 
@@ -102,7 +118,7 @@ python -m py_compile tools/ai_cli_bridge.py
 
 ## 下次新窗口怎么接上
 
-给新窗口发仓库链接即可：
+给新窗口发仓库链接即可（STATUS.md 和 HANDOFF.md 已包含完整状态）：
 ```
 继续做这个仓库：https://github.com/0xPanty/godot-2d-lite
 先看 STATUS.md 和 HANDOFF.md，然后开始里程碑 2
