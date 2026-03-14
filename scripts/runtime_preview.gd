@@ -5,7 +5,11 @@ const EventRunnerScript = preload("res://scripts/event_runner.gd")
 const BehaviorRunnerScript = preload("res://scripts/behavior_runner.gd")
 const BehaviorSystemScript = preload("res://scripts/behavior_system.gd")
 const DialogueSystemScript = preload("res://scripts/dialogue_system.gd")
+const InventorySystemScript = preload("res://scripts/inventory_system.gd")
+const QuestSystemScript = preload("res://scripts/quest_system.gd")
+const SaveSystemScript = preload("res://scripts/save_system.gd")
 const DialogueUIScene = preload("res://scenes/dialogue_ui.tscn")
+const InventoryUIScene = preload("res://scenes/inventory_ui.tscn")
 const GRID_SIZE := 32.0
 const INTERACT_DISTANCE := 84.0
 const TERRAIN_COLORS := {
@@ -28,6 +32,10 @@ var _world_ground: Node2D
 var _event_runner: Node
 var _behavior_runner: RefCounted
 var _dialogue_ui: CanvasLayer
+var _inventory_ui: CanvasLayer
+var _inventory: Dictionary = {}
+var _quest_journal: Dictionary = {}
+var _current_save_slot := 0
 
 @onready var world: Node2D = $World
 @onready var title_label: Label = $UI/Panel/Margin/VBox/TitleLabel
@@ -40,14 +48,28 @@ func _ready() -> void:
 	tile_cells = snapshot.get("tile_cells", [])
 	_build_world()
 	_setup_dialogue_ui()
+	_setup_inventory_ui()
+	_setup_inventory()
+	_setup_quest_journal()
 	_setup_behavior_runner()
 	_setup_event_runner(snapshot.get("events", []))
 	_update_header()
-	_show_message("运行预览已启动。方向键移动，E 键交互，右上角可返回编辑器。")
+	_show_message("运行预览已启动。方向键移动，E 交互，Tab 背包，F5 存档，F9 读档。")
 
 func _setup_dialogue_ui() -> void:
 	_dialogue_ui = DialogueUIScene.instantiate()
 	add_child(_dialogue_ui)
+
+func _setup_inventory_ui() -> void:
+	_inventory_ui = InventoryUIScene.instantiate()
+	add_child(_inventory_ui)
+	_inventory_ui.item_used.connect(_on_item_used)
+
+func _setup_inventory() -> void:
+	_inventory = InventorySystemScript.create_inventory()
+
+func _setup_quest_journal() -> void:
+	_quest_journal = QuestSystemScript.create_journal()
 
 func _setup_behavior_runner() -> void:
 	_behavior_runner = BehaviorRunnerScript.new()
@@ -74,6 +96,12 @@ func _setup_event_runner(event_data: Array) -> void:
 	_event_runner.dialogue_requested.connect(_on_event_dialogue)
 	_event_runner.scene_change_requested.connect(_on_event_scene_change)
 	_event_runner.object_spawn_requested.connect(_on_event_spawn)
+	_event_runner.item_added.connect(_on_event_item_added)
+	_event_runner.item_removed.connect(_on_event_item_removed)
+	_event_runner.quest_accepted.connect(_on_event_quest_accepted)
+	_event_runner.quest_completed.connect(_on_event_quest_completed)
+	_event_runner.inventory_ref = _inventory
+	_event_runner.quest_journal_ref = _quest_journal
 
 func _on_event_dialogue(object_id: String, text: String) -> void:
 	var obj_name := "系统"
@@ -98,6 +126,36 @@ func _on_event_spawn(object_type: String, pos: Vector2) -> void:
 	_create_world_object(obj_data)
 	_show_message("生成了 %s" % object_type)
 
+func _on_event_item_added(item_id: String, amount: int) -> void:
+	_add_item_to_inventory(item_id, amount)
+
+func _on_event_item_removed(item_id: String, amount: int) -> void:
+	InventorySystemScript.remove_item(_inventory, item_id, amount)
+	var def := InventorySystemScript.get_item_def(item_id)
+	_show_message("失去 %s x%d" % [def.get("name", item_id), amount])
+	if _inventory_ui:
+		_inventory_ui.set_inventory(_inventory)
+
+func _on_event_quest_accepted(quest_id: String) -> void:
+	if QuestSystemScript.accept_quest(_quest_journal, quest_id):
+		var quest := QuestSystemScript.get_quest(_quest_journal, quest_id)
+		_show_message("接受任务: %s" % quest.get("title", quest_id))
+	else:
+		_show_message("无法接受任务 %s" % quest_id)
+
+func _on_event_quest_completed(quest_id: String) -> void:
+	var result := QuestSystemScript.turn_in_quest(_quest_journal, quest_id)
+	if result.get("success", false):
+		var quest := QuestSystemScript.get_quest(_quest_journal, quest_id)
+		_show_message("完成任务: %s" % quest.get("title", quest_id))
+		for reward in result.get("rewards", []):
+			if String(reward.get("type", "")) == "item":
+				var p: Dictionary = reward.get("params", {})
+				_add_item_to_inventory(String(p.get("item_id", "")), int(p.get("amount", 1)))
+		for flag_name in result.get("flags", []):
+			if _event_runner:
+				_event_runner.flags[String(flag_name)] = true
+
 func _physics_process(delta: float) -> void:
 	if _behavior_runner:
 		_behavior_runner.process_all(delta)
@@ -106,6 +164,7 @@ func _physics_process(delta: float) -> void:
 	_update_interaction_hint()
 	if _event_runner:
 		_event_runner.process_events(delta)
+	_update_quest_progress()
 
 func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventKey and event.pressed and not event.echo:
@@ -113,6 +172,12 @@ func _unhandled_input(event: InputEvent) -> void:
 			_activate_object(active_interactable_id)
 		elif event.keycode == KEY_ESCAPE:
 			_return_to_editor()
+		elif event.keycode == KEY_F5:
+			_save_game()
+		elif event.keycode == KEY_F9:
+			_load_game()
+		elif event.keycode == KEY_Q:
+			_show_quest_log()
 
 func _build_world() -> void:
 	for child in world.get_children():
@@ -342,7 +407,7 @@ func _update_interaction_hint() -> void:
 			active_interactable_id = object_id
 
 	if active_interactable_id.is_empty():
-		hint_label.text = "方向键移动，E 交互，Esc 返回编辑器"
+		hint_label.text = "方向键移动 E交互 Tab背包 Q任务 F5存档 F9读档"
 	else:
 		var object_name := String(runtime_nodes[active_interactable_id].get("data", {}).get("name", "对象"))
 		hint_label.text = "按 E 与 %s 交互" % object_name
@@ -369,7 +434,9 @@ func _activate_object(object_id: String) -> void:
 
 	if bool(reward.get("enabled", false)):
 		consumed_object_ids[object_id] = true
-		_show_message("获得奖励：%s x%s" % [reward.get("item_id", "sample_item"), reward.get("amount", 1)])
+		var reward_item_id := String(reward.get("item_id", "coin"))
+		var reward_amount := int(reward.get("amount", 1))
+		_add_item_to_inventory(reward_item_id, reward_amount)
 		var visual: CanvasItem = entry.get("visual")
 		if visual:
 			visual.modulate = Color(0.7, 0.7, 0.7)
@@ -459,6 +526,85 @@ func _update_header() -> void:
 func _show_message(message: String) -> void:
 	message_label.clear()
 	message_label.append_text(message)
+
+## --- Inventory helpers ---
+
+func _add_item_to_inventory(item_id: String, amount: int = 1) -> void:
+	var result := InventorySystemScript.add_item(_inventory, item_id, amount)
+	var def := InventorySystemScript.get_item_def(item_id)
+	var name := String(def.get("name", item_id))
+	if result.get("success", false):
+		_show_message("获得 %s x%d" % [name, amount])
+	else:
+		_show_message("背包已满，无法获得 %s" % name)
+	if _inventory_ui:
+		_inventory_ui.set_inventory(_inventory)
+
+func _on_item_used(item_id: String) -> void:
+	var def := InventorySystemScript.get_item_def(item_id)
+	var effects: Dictionary = def.get("effects", {})
+	if effects.has("heal") and player_data.has("hp"):
+		var hp := float(player_data.get("hp", 0))
+		var max_hp := float(player_data.get("max_hp", 100))
+		player_data["hp"] = minf(hp + float(effects["heal"]), max_hp)
+		_show_message("使用 %s，恢复了 %d 生命值" % [def.get("name", item_id), int(effects["heal"])])
+	else:
+		_show_message("使用了 %s" % def.get("name", item_id))
+	InventorySystemScript.remove_item(_inventory, item_id, 1)
+	if _inventory_ui:
+		_inventory_ui.set_inventory(_inventory)
+
+## --- Quest helpers ---
+
+func _show_quest_log() -> void:
+	var active := QuestSystemScript.get_active_quests(_quest_journal)
+	if active.is_empty():
+		_show_message("当前没有进行中的任务。")
+		return
+	var lines: PackedStringArray = []
+	for quest in active:
+		lines.append("[b]%s[/b] — %s" % [quest.get("title", "?"), quest.get("description", "")])
+		for obj in quest.get("objectives", []):
+			lines.append("  %s" % QuestSystemScript.objective_label(obj))
+	_show_message("\n".join(lines))
+
+func _update_quest_progress() -> void:
+	var flags: Dictionary = _event_runner.flags if _event_runner else {}
+	var player_pos := player_body.global_position if player_body else Vector2.ZERO
+	for quest_id in _quest_journal.get("quests", {}).keys():
+		var quest: Dictionary = _quest_journal["quests"][quest_id]
+		if int(quest.get("status", 0)) == QuestSystemScript.QuestStatus.ACTIVE:
+			QuestSystemScript.check_objectives(_quest_journal, quest_id, flags, _inventory, player_pos)
+
+## --- Save/Load ---
+
+func _save_game() -> void:
+	var flags: Dictionary = _event_runner.flags if _event_runner else {}
+	var player_pos := player_body.global_position if player_body else Vector2.ZERO
+	var state := SaveSystemScript.capture_runtime_state(player_pos, _inventory, _quest_journal, flags, consumed_object_ids)
+	var result := SaveSystemScript.save_game(_current_save_slot, state)
+	if result.get("success", false):
+		_show_message("游戏已保存到槽位 %d。" % _current_save_slot)
+	else:
+		_show_message("保存失败：%s" % result.get("reason", "unknown"))
+
+func _load_game() -> void:
+	var result := SaveSystemScript.load_game(_current_save_slot)
+	if not result.get("success", false):
+		_show_message("读档失败：%s" % result.get("reason", "no_save"))
+		return
+	var state := SaveSystemScript.extract_runtime_state(result)
+	_inventory = state.get("inventory", InventorySystemScript.create_inventory())
+	_quest_journal = state.get("quest_journal", QuestSystemScript.create_journal())
+	consumed_object_ids = state.get("consumed_object_ids", {})
+	if _event_runner:
+		_event_runner.flags = state.get("flags", {})
+	var pos: Vector2 = state.get("player_position", Vector2.ZERO)
+	if player_body and pos != Vector2.ZERO:
+		player_body.global_position = pos
+	if _inventory_ui:
+		_inventory_ui.set_inventory(_inventory)
+	_show_message("已从槽位 %d 读取存档。" % _current_save_slot)
 
 func _return_to_editor() -> void:
 	get_tree().change_scene_to_file("res://scenes/editor_main.tscn")

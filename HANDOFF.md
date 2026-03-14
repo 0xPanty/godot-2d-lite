@@ -14,7 +14,7 @@
 4. **三层处理策略** — 默认值自动化 / 简化成人话开关 / AI 兜底处理边缘情况
 5. **保持跨平台**
 
-## 当前完成状态：里程碑 1 + 里程碑 2 核心
+## 当前完成状态：里程碑 1 + 里程碑 2 + 里程碑 3 核心
 
 ### 里程碑 1 已完成
 - ✅ 编辑器主界面骨架（三栏布局）
@@ -34,6 +34,12 @@
 - ✅ 行为系统（10种预设：俯视角/平台跳跃/巡逻/追逐/逃跑/悬浮/投射/跟随/游走）
 - ✅ 对话系统（多节点对话树、选择支、旗标条件分支、底部对话框UI）
 
+### 里程碑 3 已完成
+- 背包/物品系统（8种内置物品、6种分类、堆叠、容量、运行时网格UI、Tab切换）
+- 任务系统（5种状态、6种目标类型、前置条件、奖励、自动进度检测、Q键任务日志）
+- 存档系统（10槽位、F5存档/F9读档、保存玩家位置+背包+任务+旗标+已消耗对象）
+- 事件系统扩展（HAS_ITEM/QUEST_STATUS条件、REMOVE_ITEM/ACCEPT_QUEST/COMPLETE_QUEST动作）
+
 ### 关键文件
 | 文件 | 作用 |
 |------|------|
@@ -50,6 +56,10 @@
 | `scripts/dialogue_ui.gd` | 运行时对话框 UI（选择支、旗标分支） |
 | `scripts/ai_client.gd` | AI 客户端（Ollama + OpenAI） |
 | `scripts/logic_templates.gd` | 内置关键词模板（AI不可用时回退） |
+| `scripts/inventory_system.gd` | 背包/物品系统（物品定义表+增删查改+序列化） |
+| `scripts/inventory_ui.gd` | 运行时背包 UI（网格+详情+使用） |
+| `scripts/quest_system.gd` | 任务系统（定义+目标检测+奖励+序列化） |
+| `scripts/save_system.gd` | 存档系统（10槽位+状态捕获恢复） |
 | `scripts/undo_redo_manager.gd` | 撤销/重做管理器 |
 | `tools/ai_cli_bridge.py` | CLI/API 桥接（10 个命令） |
 | `export_presets.cfg` | 导出预设 |
@@ -65,7 +75,11 @@
 运行预览层 (runtime_preview.gd)
     ├── event_runner.gd     ← 条件-动作事件执行
     ├── behavior_runner.gd  ← 行为状态机驱动
-    └── dialogue_ui.gd     ← 对话框交互
+    ├── dialogue_ui.gd     ← 对话框交互
+    ├── inventory_ui.gd    ← 背包 UI（Tab 切换）
+    ├── inventory_system.gd ← 物品增删查改
+    ├── quest_system.gd    ← 任务进度检测
+    └── save_system.gd     ← 存档/读档
     
 AI 层 (ai_client.gd → Ollama/OpenAI)
     ↓ 回退
@@ -74,23 +88,18 @@ AI 层 (ai_client.gd → Ollama/OpenAI)
 CLI 层 (ai_cli_bridge.py → editor_state.json)
 ```
 
-## 里程碑 3 要做什么
+## 里程碑 4 要做什么
 
 ### 第一优先级
-1. **背包/物品系统** — 物品定义表 + 拾取/使用逻辑 + UI 显示
-2. **任务系统原型** — 任务定义 + 条件触发 + 完成检测
-3. **存档系统** — 运行时游戏存档/读档
+1. 动画系统（精灵帧动画编辑 + AnimationPlayer 封装）
+2. TileMap 正式化（用 Godot 原生 TileMap 节点，支持自动图块拼接）
+3. 多场景管理（场景列表、场景切换编辑）
 
 ### 第二优先级
-4. 动画系统（精灵帧动画编辑 + AnimationPlayer 封装）
-5. TileMap 正式化（用 Godot 原生 TileMap 节点，支持自动图块拼接）
-6. 多场景管理（场景列表、场景切换编辑）
-
-### 第三优先级
-7. 多工作区编辑器（Tab 式）
-8. 内置资源库
-9. 游戏导出（用户的游戏也能打包）
-10. 插件商店
+4. 多工作区编辑器（Tab 式）
+5. 内置资源库
+6. 游戏导出（用户的游戏也能打包）
+7. 插件商店
 
 ## 调研报告摘要
 
@@ -121,5 +130,5 @@ python -m py_compile tools/ai_cli_bridge.py
 给新窗口发仓库链接即可（STATUS.md 和 HANDOFF.md 已包含完整状态）：
 ```
 继续做这个仓库：https://github.com/0xPanty/godot-2d-lite
-先看 STATUS.md 和 HANDOFF.md，然后开始里程碑 2
+先看 STATUS.md 和 HANDOFF.md，然后开始里程碑 4
 ```

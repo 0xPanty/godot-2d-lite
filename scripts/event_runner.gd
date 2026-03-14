@@ -7,12 +7,18 @@ signal dialogue_requested(object_id: String, text: String)
 signal scene_change_requested(scene_path: String)
 signal object_spawn_requested(object_type: String, position: Vector2)
 signal flag_changed(flag_name: String, value: bool)
+signal item_added(item_id: String, amount: int)
+signal item_removed(item_id: String, amount: int)
+signal quest_accepted(quest_id: String)
+signal quest_completed(quest_id: String)
 
 var events: Array[Dictionary] = []
 var flags: Dictionary = {}
 var timers: Dictionary = {}
 var runtime_nodes: Dictionary = {}
 var player_node: Node2D
+var inventory_ref: Dictionary = {}
+var quest_journal_ref: Dictionary = {}
 var _waiting := false
 var _wait_remaining := 0.0
 
@@ -124,6 +130,21 @@ func _check_condition(cond: Dictionary) -> bool:
 			var timer_id := String(p.get("timer_id", ""))
 			return timers.get(timer_id, {}).get("finished", false)
 
+		ES.ConditionType.HAS_ITEM:
+			var item_id := String(p.get("item_id", ""))
+			var needed := int(p.get("amount", 1))
+			var total := 0
+			for slot in inventory_ref.get("slots", []):
+				if String(slot.get("item_id", "")) == item_id:
+					total += int(slot.get("amount", 0))
+			return total >= needed
+
+		ES.ConditionType.QUEST_STATUS:
+			var quest_id := String(p.get("quest_id", ""))
+			var expected := int(p.get("status", 0))
+			var quest: Dictionary = quest_journal_ref.get("quests", {}).get(quest_id, {})
+			return int(quest.get("status", -1)) == expected
+
 		_:
 			return false
 
@@ -199,7 +220,26 @@ func _run_action(act: Dictionary) -> void:
 			_wait_remaining = float(p.get("seconds", 0))
 
 		ES.ActionType.ADD_ITEM:
-			pass # TODO: integrate with inventory system
+			var item_id := String(p.get("item_id", ""))
+			var amount := int(p.get("amount", 1))
+			if not item_id.is_empty():
+				item_added.emit(item_id, amount)
+
+		ES.ActionType.REMOVE_ITEM:
+			var item_id := String(p.get("item_id", ""))
+			var amount := int(p.get("amount", 1))
+			if not item_id.is_empty():
+				item_removed.emit(item_id, amount)
+
+		ES.ActionType.ACCEPT_QUEST:
+			var quest_id := String(p.get("quest_id", ""))
+			if not quest_id.is_empty():
+				quest_accepted.emit(quest_id)
+
+		ES.ActionType.COMPLETE_QUEST:
+			var quest_id := String(p.get("quest_id", ""))
+			if not quest_id.is_empty():
+				quest_completed.emit(quest_id)
 
 		ES.ActionType.CAMERA_SHAKE:
 			pass # TODO: implement camera shake

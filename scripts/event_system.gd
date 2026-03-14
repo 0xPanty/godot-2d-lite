@@ -13,6 +13,8 @@ enum ConditionType {
 	TIMER_FINISHED,   # 定时器结束
 	OBJECT_TYPE_IS,   # 对象类型是
 	ALWAYS,           # 始终为真（每帧执行）
+	HAS_ITEM,         # 背包中有指定物品
+	QUEST_STATUS,     # 任务状态检查
 }
 
 ## Action types that modify game state
@@ -33,6 +35,8 @@ enum ActionType {
 	WAIT,             # 等待秒数
 	ADD_ITEM,         # 添加物品到背包
 	REMOVE_ITEM,      # 从背包移除物品
+	ACCEPT_QUEST,     # 接受任务
+	COMPLETE_QUEST,   # 完成任务
 }
 
 ## Compare operators for property conditions
@@ -121,6 +125,21 @@ static func act_spawn(object_type: String, x: float, y: float) -> Dictionary:
 static func act_add_item(item_id: String, amount: int = 1) -> Dictionary:
 	return create_action(ActionType.ADD_ITEM, {"item_id": item_id, "amount": amount})
 
+static func act_remove_item(item_id: String, amount: int = 1) -> Dictionary:
+	return create_action(ActionType.REMOVE_ITEM, {"item_id": item_id, "amount": amount})
+
+static func act_accept_quest(quest_id: String) -> Dictionary:
+	return create_action(ActionType.ACCEPT_QUEST, {"quest_id": quest_id})
+
+static func act_complete_quest(quest_id: String) -> Dictionary:
+	return create_action(ActionType.COMPLETE_QUEST, {"quest_id": quest_id})
+
+static func cond_has_item(item_id: String, amount: int = 1) -> Dictionary:
+	return create_condition(ConditionType.HAS_ITEM, {"item_id": item_id, "amount": amount})
+
+static func cond_quest_status(quest_id: String, status: int) -> Dictionary:
+	return create_condition(ConditionType.QUEST_STATUS, {"quest_id": quest_id, "status": status})
+
 static func act_wait(seconds: float) -> Dictionary:
 	return create_action(ActionType.WAIT, {"seconds": seconds})
 
@@ -173,6 +192,10 @@ static func condition_label(cond: Dictionary) -> String:
 			return prefix + "旗标 [%s] 未设置" % p.get("flag", "?")
 		ConditionType.ALWAYS:
 			return "始终"
+		ConditionType.HAS_ITEM:
+			return prefix + "背包有 %s x%s" % [p.get("item_id", "?"), p.get("amount", 1)]
+		ConditionType.QUEST_STATUS:
+			return prefix + "任务 %s 状态为 %s" % [p.get("quest_id", "?"), p.get("status", 0)]
 		_:
 			return prefix + "未知条件"
 
@@ -205,6 +228,12 @@ static func action_label(act: Dictionary) -> String:
 			return "获得 %s x%s" % [p.get("item_id", "?"), p.get("amount", 1)]
 		ActionType.WAIT:
 			return "等待 %s 秒" % p.get("seconds", 0)
+		ActionType.REMOVE_ITEM:
+			return "移除 %s x%s" % [p.get("item_id", "?"), p.get("amount", 1)]
+		ActionType.ACCEPT_QUEST:
+			return "接受任务: %s" % p.get("quest_id", "?")
+		ActionType.COMPLETE_QUEST:
+			return "完成任务: %s" % p.get("quest_id", "?")
 		_:
 			return "未知动作"
 
