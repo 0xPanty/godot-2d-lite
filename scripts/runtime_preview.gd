@@ -36,6 +36,8 @@ var _inventory_ui: CanvasLayer
 var _inventory: Dictionary = {}
 var _quest_journal: Dictionary = {}
 var _current_save_slot := 0
+var _quest_check_timer := 0.0
+const QUEST_CHECK_INTERVAL := 0.5
 
 @onready var world: Node2D = $World
 @onready var title_label: Label = $UI/Panel/Margin/VBox/TitleLabel
@@ -164,7 +166,10 @@ func _physics_process(delta: float) -> void:
 	_update_interaction_hint()
 	if _event_runner:
 		_event_runner.process_events(delta)
-	_update_quest_progress()
+	_quest_check_timer += delta
+	if _quest_check_timer >= QUEST_CHECK_INTERVAL:
+		_quest_check_timer = 0.0
+		_update_quest_progress()
 
 func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventKey and event.pressed and not event.echo:
@@ -599,6 +604,8 @@ func _load_game() -> void:
 	consumed_object_ids = state.get("consumed_object_ids", {})
 	if _event_runner:
 		_event_runner.flags = state.get("flags", {})
+		_event_runner.inventory_ref = _inventory
+		_event_runner.quest_journal_ref = _quest_journal
 	var pos: Vector2 = state.get("player_position", Vector2.ZERO)
 	if player_body and pos != Vector2.ZERO:
 		player_body.global_position = pos
