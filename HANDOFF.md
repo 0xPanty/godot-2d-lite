@@ -14,7 +14,7 @@
 4. **三层处理策略** — 默认值自动化 / 简化成人话开关 / AI 兜底处理边缘情况
 5. **保持跨平台**
 
-## 当前完成状态：里程碑 1 + 里程碑 2 + 里程碑 3 + 里程碑 4
+## 当前完成状态：里程碑 1 ~ 里程碑 5
 
 ### 里程碑 1 已完成
 - ✅ 编辑器主界面骨架（三栏布局）
@@ -44,6 +44,10 @@
 - 动画系统（8种预设、精灵表分割、编辑器面板管理、运行时自动切换行走/待机）
 - 多场景管理（场景索引、独立数据文件、编辑器下拉切换、新增/删除场景）
 
+### 里程碑 5 已完成
+- TileMap 正式化（原生 TileMap 替代自定义绘制、物理图层自动配置、tile_cells 双向转换）
+- 内置资源库（6种占位资源、3个项目模板、编辑器底部资源库 Tab）
+
 ### 关键文件
 | 文件 | 作用 |
 |------|------|
@@ -67,6 +71,8 @@
 | `scripts/animation_system.gd` | 动画数据模型（8种预设+精灵表分割） |
 | `scripts/animation_runner.gd` | 运行时动画播放器（自动切换+AtlasTexture） |
 | `scripts/scene_manager.gd` | 多场景管理（索引+独立数据文件） |
+| `scripts/tilemap_builder.gd` | TileMap 构建器（TileSet+物理图层） |
+| `scripts/resource_library.gd` | 内置资源库（占位资源+项目模板） |
 | `scripts/undo_redo_manager.gd` | 撤销/重做管理器 |
 | `tools/ai_cli_bridge.py` | CLI/API 桥接（10 个命令） |
 | `export_presets.cfg` | 导出预设 |
@@ -87,7 +93,8 @@
     ├── inventory_system.gd ← 物品增删查改
     ├── quest_system.gd    ← 任务进度检测
     ├── save_system.gd     ← 存档/读档
-    └── animation_runner.gd ← 精灵动画播放
+    ├── animation_runner.gd ← 精灵动画播放
+    └── tilemap (native)   ← 原生 TileMap 地图渲染
     
 AI 层 (ai_client.gd → Ollama/OpenAI)
     ↓ 回退
@@ -96,16 +103,14 @@ AI 层 (ai_client.gd → Ollama/OpenAI)
 CLI 层 (ai_cli_bridge.py → editor_state.json)
 ```
 
-## 里程碑 5 要做什么
+## 里程碑 6 要做什么
 
 ### 第一优先级
-1. TileMap 正式化（用 Godot 原生 TileMap 节点，支持自动图块拼接）
-2. 多工作区编辑器（Tab 式）
-3. 内置资源库
+1. 多工作区编辑器（Tab 式）
+2. 游戏导出（用户的游戏也能打包）
 
 ### 第二优先级
-4. 游戏导出（用户的游戏也能打包）
-5. 插件商店
+3. 插件商店
 
 ## 调研报告摘要
 
@@ -136,5 +141,5 @@ python -m py_compile tools/ai_cli_bridge.py
 给新窗口发仓库链接即可（STATUS.md 和 HANDOFF.md 已包含完整状态）：
 ```
 继续做这个仓库：https://github.com/0xPanty/godot-2d-lite
-先看 STATUS.md 和 HANDOFF.md，然后开始里程碑 5
+先看 STATUS.md 和 HANDOFF.md，然后开始里程碑 6
 ```

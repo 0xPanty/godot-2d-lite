@@ -1,6 +1,6 @@
 # godot-2d-lite 当前状态
 
-最后同步阶段：`里程碑 4 进行中 — 表现层与场景管理`
+最后同步阶段：`里程碑 5 完成 — 原生地图与资源库`
 
 ## 产品目标
 - 做一个基于 Godot 的 2D 轻量编辑器框架。
@@ -70,6 +70,8 @@
 - `scripts/animation_system.gd`: 动画数据模型（8种预设+精灵表分割+序列化）
 - `scripts/animation_runner.gd`: 运行时动画播放器（自动切换+AtlasTexture）
 - `scripts/scene_manager.gd`: 多场景管理（场景索引+独立数据文件+增删改查）
+- `scripts/tilemap_builder.gd`: TileMap 构建器（TileSet 生成+物理图层+双向转换）
+- `scripts/resource_library.gd`: 内置资源库（占位资源+项目模板+模板应用）
 - `scripts/placeholder_target.gd`: 占位目标场景
 
 ### 场景文件
@@ -160,16 +162,29 @@
 ### 注意
 - TileMap 正式化（Godot 原生 TileMap 节点）推迟到里程碑 5，当前地图绘制系统可用
 
-## 里程碑 5 方向（下一步）
+## 里程碑 5 已完成内容
+
+### TileMap 正式化
+- TileMapBuilder 工具类（程序化生成 TileSet + TileMap）
+- 每种地形一个 TileSetAtlasSource（纯色纹理，32x32）
+- 物理图层自动配置（wall/water 自动加碰撞多边形）
+- 运行时用原生 TileMap 替代自定义 Node2D 绘制（删减 ~60 行旧代码）
+- 双向转换：tile_cells ↔ TileMap
+
+### 内置资源库
+- 6 种内置占位资源（玩家/NPC/敌人角色、基础地块、对话框、粒子效果）
+- 3 个项目模板（俯视角RPG、横版平台跳跃、空白项目）
+- 模板自动生成对象 + 地图（围墙边框、平台地面）
+- 编辑器底部资源库 Tab（资源网格 + 模板选择器 + 一键应用）
+
+## 里程碑 6 方向（下一步）
 
 ### 第一优先级
-1. TileMap 正式化（用 Godot 原生 TileMap 节点，支持自动图块拼接）
-2. 多工作区编辑器布局（Tab 式，参考 GDevelop）
-3. 内置资源库/模板项目
+1. 多工作区编辑器布局（Tab 式，参考 GDevelop）
+2. 游戏导出（让用户做的游戏也能打包发布）
 
 ### 第二优先级
-4. 游戏导出（让用户做的游戏也能打包发布）
-5. 插件商店（内置扩展下载机制）
+3. 插件商店（内置扩展下载机制）
 
 ## 调研报告中的关键设计建议
 
