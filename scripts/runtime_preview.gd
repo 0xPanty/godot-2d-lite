@@ -4,6 +4,8 @@ const ProjectStoreScript = preload("res://scripts/project_store.gd")
 const EventRunnerScript = preload("res://scripts/event_runner.gd")
 const BehaviorRunnerScript = preload("res://scripts/behavior_runner.gd")
 const BehaviorSystemScript = preload("res://scripts/behavior_system.gd")
+const DialogueSystemScript = preload("res://scripts/dialogue_system.gd")
+const DialogueUIScene = preload("res://scenes/dialogue_ui.tscn")
 const GRID_SIZE := 32.0
 const INTERACT_DISTANCE := 84.0
 const TERRAIN_COLORS := {
@@ -25,6 +27,7 @@ var consumed_object_ids := {}
 var _world_ground: Node2D
 var _event_runner: Node
 var _behavior_runner: RefCounted
+var _dialogue_ui: CanvasLayer
 
 @onready var world: Node2D = $World
 @onready var title_label: Label = $UI/Panel/Margin/VBox/TitleLabel
@@ -36,10 +39,15 @@ func _ready() -> void:
 	scene_objects = snapshot.get("scene_objects", [])
 	tile_cells = snapshot.get("tile_cells", [])
 	_build_world()
+	_setup_dialogue_ui()
 	_setup_behavior_runner()
 	_setup_event_runner(snapshot.get("events", []))
 	_update_header()
 	_show_message("运行预览已启动。方向键移动，E 键交互，右上角可返回编辑器。")
+
+func _setup_dialogue_ui() -> void:
+	_dialogue_ui = DialogueUIScene.instantiate()
+	add_child(_dialogue_ui)
 
 func _setup_behavior_runner() -> void:
 	_behavior_runner = BehaviorRunnerScript.new()
@@ -71,7 +79,14 @@ func _on_event_dialogue(object_id: String, text: String) -> void:
 	var obj_name := "系统"
 	if runtime_nodes.has(object_id):
 		obj_name = String(runtime_nodes[object_id].get("data", {}).get("name", object_id))
-	_show_message("%s：%s" % [obj_name, text])
+	if _dialogue_ui and not _dialogue_ui.is_active():
+		var dlg := DialogueSystemScript.build_linear("", [[obj_name, text]])
+		var flags: Dictionary = {}
+		if _event_runner:
+			flags = _event_runner.flags
+		_dialogue_ui.start_dialogue(dlg, flags)
+	else:
+		_show_message("%s：%s" % [obj_name, text])
 
 func _on_event_scene_change(scene_path: String) -> void:
 	_show_message("切换场景: %s" % scene_path)
@@ -365,9 +380,25 @@ func _activate_object(object_id: String) -> void:
 		_show_message("触发事件：%s" % event_behavior.get("event_id", "sample_event"))
 		return
 
+	# Check for rich dialogue data first
+	var dialogue_data: Variant = object_data.get("dialogue_data", null)
+	if dialogue_data is Dictionary and not dialogue_data.is_empty():
+		if _dialogue_ui and not _dialogue_ui.is_active():
+			var flags: Dictionary = _event_runner.flags if _event_runner else {}
+			_dialogue_ui.start_dialogue(dialogue_data, flags)
+		if _is_single_use(object_data):
+			consumed_object_ids[object_id] = true
+		return
+
+	# Fallback to simple text dialogue
 	var dialogue := String(object_data.get("dialogue", "")).strip_edges()
 	if not dialogue.is_empty():
-		_show_message("%s：%s" % [object_data.get("name", "对象"), dialogue])
+		var speaker := String(object_data.get("name", "对象"))
+		if _dialogue_ui and not _dialogue_ui.is_active():
+			var dlg := DialogueSystemScript.build_linear("", [[speaker, dialogue]])
+			_dialogue_ui.start_dialogue(dlg)
+		else:
+			_show_message("%s：%s" % [speaker, dialogue])
 		if _is_single_use(object_data):
 			consumed_object_ids[object_id] = true
 		return
