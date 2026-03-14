@@ -6,6 +6,8 @@ const UndoRedoScript = preload("res://scripts/undo_redo_manager.gd")
 const AIClientScript = preload("res://scripts/ai_client.gd")
 const EventSystemScript = preload("res://scripts/event_system.gd")
 const BehaviorSystemScript = preload("res://scripts/behavior_system.gd")
+const AnimationSystemScript = preload("res://scripts/animation_system.gd")
+const SceneManagerScript = preload("res://scripts/scene_manager.gd")
 const OBJECT_TYPES := ["player", "npc", "door", "chest", "trigger", "prop"]
 const TRIGGER_MODES := ["interact", "touch", "area", "auto"]
 const TILE_LAYERS := ["ground", "decoration", "collision"]
@@ -18,6 +20,8 @@ var events: Array[Dictionary] = []
 var selected_resource_index := -1
 var selected_object_id := ""
 var _next_object_id := 1
+var _current_scene_id := "main"
+var _scene_list: Array[Dictionary] = []
 var tool_mode := "select"
 var selected_terrain := "ground"
 var selected_layer := "ground"
@@ -27,6 +31,7 @@ var _ai_client: Node
 var _ai_available := false
 var _ai_pending_object_index := -1
 
+@onready var scene_option: OptionButton = $MainSplit/LeftPanel/SceneRow/SceneOption
 @onready var resource_list: ItemList = $MainSplit/LeftPanel/ResourceList
 @onready var object_list: ItemList = $MainSplit/LeftPanel/ObjectList
 @onready var canvas = $MainSplit/CenterPanel/CanvasPanel/SceneCanvas
@@ -43,6 +48,7 @@ var _ai_pending_object_index := -1
 @onready var dialogue_edit: TextEdit = $MainSplit/RightPanel/Inspector/DialogueEdit
 @onready var prompt_input: TextEdit = $MainSplit/RightPanel/AIPanel/PromptInput
 @onready var behavior_container: VBoxContainer = $MainSplit/RightPanel/Inspector/BehaviorContainer
+@onready var animation_container: VBoxContainer = $MainSplit/RightPanel/Inspector/AnimationContainer
 
 func _ready() -> void:
 	_undo_redo = UndoRedoScript.new()
@@ -51,7 +57,8 @@ func _ready() -> void:
 	_setup_options()
 	_setup_dialog()
 	_bind_events()
-	_load_snapshot()
+	_init_scene_manager()
+	_load_current_scene()
 	if scene_objects.is_empty():
 		_add_object("player")
 	refresh_all()
@@ -169,6 +176,8 @@ func _request_save() -> void:
 
 func _do_save_snapshot() -> void:
 	ProjectStoreScript.save_snapshot(resources, scene_objects, _next_object_id, tile_cells, events)
+	if _current_scene_id != "main":
+		_save_current_scene()
 
 func _record_and_save() -> void:
 	_push_undo_state()
@@ -193,6 +202,7 @@ func _on_add_trigger_pressed() -> void:
 	_add_object("trigger")
 
 func _on_preview_pressed() -> void:
+	_save_current_scene()
 	_do_save_snapshot()
 	append_log("已生成预览快照，准备切换到运行预览。")
 	get_tree().change_scene_to_file("res://scenes/runtime_preview.tscn")
@@ -490,6 +500,7 @@ func refresh_inspector() -> void:
 	dialogue_edit.editable = has_object
 
 	_refresh_behavior_ui(object_index if has_object else -1)
+	_refresh_animation_ui(object_index if has_object else -1)
 
 	if not has_object:
 		name_edit.text = ""
@@ -555,6 +566,174 @@ func _find_tile_index(cell: Vector2i, layer: String = "ground") -> int:
 		if int(tile_cells[index].get("x", -1)) == cell.x and int(tile_cells[index].get("y", -1)) == cell.y and String(tile_cells[index].get("layer", "ground")) == layer:
 			return index
 	return -1
+
+# --- Scene Management ---
+
+func _init_scene_manager() -> void:
+	_scene_list = SceneManagerScript.load_index()
+	_refresh_scene_option()
+
+func _refresh_scene_option() -> void:
+	scene_option.clear()
+	var selected_idx := 0
+	for i in _scene_list.size():
+		var entry: Dictionary = _scene_list[i]
+		scene_option.add_item(String(entry.get("title", "?")), i)
+		if String(entry.get("id", "")) == _current_scene_id:
+			selected_idx = i
+	scene_option.select(selected_idx)
+
+func _load_current_scene() -> void:
+	if _current_scene_id == "main":
+		_load_snapshot()
+	else:
+		var data := SceneManagerScript.load_scene_data(_current_scene_id)
+		if data.is_empty():
+			_load_snapshot()
+		else:
+			resources = _deserialize_resources(data.get("resources", []))
+			scene_objects = _deserialize_scene_objects(data.get("scene_objects", []))
+			_next_object_id = int(data.get("next_object_id", 1))
+			tile_cells = _deserialize_tile_cells(data.get("tile_cells", []))
+			events = []
+			for evt in data.get("events", []):
+				events.append(evt)
+			if not scene_objects.is_empty():
+				selected_object_id = String(scene_objects[0].get("id", ""))
+
+func _save_current_scene() -> void:
+	if _current_scene_id == "main":
+		ProjectStoreScript.save_snapshot(resources, scene_objects, _next_object_id, tile_cells, events)
+	else:
+		var data := {
+			"resources": ProjectStoreScript._serialize_resources(resources),
+			"scene_objects": ProjectStoreScript._serialize_scene_objects(scene_objects),
+			"next_object_id": _next_object_id,
+			"tile_cells": ProjectStoreScript._serialize_tile_cells(tile_cells),
+			"events": events.duplicate(true),
+		}
+		SceneManagerScript.save_scene_data(_current_scene_id, data)
+
+func _deserialize_resources(data: Array) -> Array[Dictionary]:
+	return ProjectStoreScript._deserialize_resources(data)
+
+func _deserialize_scene_objects(data: Array) -> Array[Dictionary]:
+	return ProjectStoreScript._deserialize_scene_objects(data)
+
+func _deserialize_tile_cells(data: Array) -> Array[Dictionary]:
+	return ProjectStoreScript._deserialize_tile_cells(data)
+
+func _on_scene_option_selected(index: int) -> void:
+	if index < 0 or index >= _scene_list.size():
+		return
+	var new_id := String(_scene_list[index].get("id", ""))
+	if new_id == _current_scene_id:
+		return
+	_save_current_scene()
+	_current_scene_id = new_id
+	_load_current_scene()
+	refresh_all()
+	_push_undo_state()
+	append_log("已切换到场景: %s" % _scene_list[index].get("title", "?"))
+
+func _on_add_scene_pressed() -> void:
+	var entry := SceneManagerScript.add_scene("新场景 %d" % (_scene_list.size() + 1))
+	_scene_list = SceneManagerScript.load_index()
+	_save_current_scene()
+	_current_scene_id = String(entry.get("id", ""))
+	_load_current_scene()
+	_refresh_scene_option()
+	refresh_all()
+	_push_undo_state()
+	append_log("已创建新场景: %s" % entry.get("title", ""))
+
+func _on_remove_scene_pressed() -> void:
+	if _current_scene_id == "main":
+		append_log("无法删除主场景。")
+		return
+	var removed_title := ""
+	for s in _scene_list:
+		if String(s.get("id", "")) == _current_scene_id:
+			removed_title = String(s.get("title", ""))
+	SceneManagerScript.remove_scene(_current_scene_id)
+	_scene_list = SceneManagerScript.load_index()
+	_current_scene_id = "main"
+	_load_current_scene()
+	_refresh_scene_option()
+	refresh_all()
+	_push_undo_state()
+	append_log("已删除场景: %s" % removed_title)
+
+# --- Animation UI ---
+
+func _refresh_animation_ui(object_index: int) -> void:
+	for child in animation_container.get_children():
+		child.queue_free()
+
+	if object_index == -1:
+		return
+
+	var obj := scene_objects[object_index]
+	var anim_set: Dictionary = obj.get("animation_set", {})
+	var anims: Dictionary = anim_set.get("animations", {})
+
+	for anim_id in anims.keys():
+		var anim: Dictionary = anims[anim_id]
+		var preset := AnimationSystemScript.get_preset(anim_id)
+		var row := HBoxContainer.new()
+
+		var color_rect := ColorRect.new()
+		color_rect.color = preset.get("color", Color.WHITE)
+		color_rect.custom_minimum_size = Vector2(12, 12)
+		row.add_child(color_rect)
+
+		var frame_count: int = anim.get("frames", []).size()
+		var label := Label.new()
+		label.text = "%s (%d帧, %dfps)" % [AnimationSystemScript.animation_label(anim_id), frame_count, int(anim.get("fps", 8))]
+		label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		row.add_child(label)
+
+		var remove_btn := Button.new()
+		remove_btn.text = "✕"
+		remove_btn.custom_minimum_size.x = 28
+		var aid := anim_id
+		remove_btn.pressed.connect(func():
+			_remove_animation(object_index, aid)
+		)
+		row.add_child(remove_btn)
+		animation_container.add_child(row)
+
+	var add_btn := MenuButton.new()
+	add_btn.text = "+ 添加动画"
+	add_btn.flat = false
+	var popup := add_btn.get_popup()
+	var presets := AnimationSystemScript.get_presets()
+	for pi in presets.size():
+		popup.add_item("%s — %s" % [presets[pi].get("name", ""), presets[pi].get("description", "")], pi)
+	popup.id_pressed.connect(func(id: int):
+		_add_animation(object_index, String(presets[id].get("id", "")))
+	)
+	animation_container.add_child(add_btn)
+
+func _add_animation(object_index: int, anim_id: String) -> void:
+	if object_index < 0 or object_index >= scene_objects.size():
+		return
+	if not scene_objects[object_index].has("animation_set"):
+		scene_objects[object_index]["animation_set"] = AnimationSystemScript.create_animation_set()
+	var anim := AnimationSystemScript.create_animation(anim_id)
+	AnimationSystemScript.add_animation(scene_objects[object_index]["animation_set"], anim)
+	refresh_inspector()
+	_record_and_save()
+	append_log("已添加动画: %s" % AnimationSystemScript.animation_label(anim_id))
+
+func _remove_animation(object_index: int, anim_id: String) -> void:
+	if object_index < 0 or object_index >= scene_objects.size():
+		return
+	var anim_set: Dictionary = scene_objects[object_index].get("animation_set", {})
+	AnimationSystemScript.remove_animation(anim_set, anim_id)
+	refresh_inspector()
+	_record_and_save()
+	append_log("已移除动画: %s" % AnimationSystemScript.animation_label(anim_id))
 
 # --- Behavior UI ---
 

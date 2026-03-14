@@ -8,6 +8,7 @@ const DialogueSystemScript = preload("res://scripts/dialogue_system.gd")
 const InventorySystemScript = preload("res://scripts/inventory_system.gd")
 const QuestSystemScript = preload("res://scripts/quest_system.gd")
 const SaveSystemScript = preload("res://scripts/save_system.gd")
+const AnimationRunnerScript = preload("res://scripts/animation_runner.gd")
 const DialogueUIScene = preload("res://scenes/dialogue_ui.tscn")
 const InventoryUIScene = preload("res://scenes/inventory_ui.tscn")
 const GRID_SIZE := 32.0
@@ -33,6 +34,7 @@ var _event_runner: Node
 var _behavior_runner: RefCounted
 var _dialogue_ui: CanvasLayer
 var _inventory_ui: CanvasLayer
+var _animation_runner: RefCounted
 var _inventory: Dictionary = {}
 var _quest_journal: Dictionary = {}
 var _current_save_slot := 0
@@ -54,6 +56,7 @@ func _ready() -> void:
 	_setup_inventory()
 	_setup_quest_journal()
 	_setup_behavior_runner()
+	_setup_animation_runner()
 	_setup_event_runner(snapshot.get("events", []))
 	_update_header()
 	_show_message("运行预览已启动。方向键移动，E 交互，Tab 背包，F5 存档，F9 读档。")
@@ -85,6 +88,18 @@ func _setup_behavior_runner() -> void:
 		for beh in attached:
 			if beh is Dictionary and bool(beh.get("enabled", true)):
 				_behavior_runner.register(node, beh, player_body)
+
+func _setup_animation_runner() -> void:
+	_animation_runner = AnimationRunnerScript.new()
+	for object_id in runtime_nodes.keys():
+		var entry: Dictionary = runtime_nodes[object_id]
+		var obj_data: Dictionary = entry.get("data", {})
+		var node: Node2D = entry.get("node")
+		if node == null:
+			continue
+		var anim_set: Dictionary = obj_data.get("animation_set", {})
+		if not anim_set.get("animations", {}).is_empty():
+			_animation_runner.register(node, anim_set)
 
 func _setup_event_runner(event_data: Array) -> void:
 	_event_runner = EventRunnerScript.new()
@@ -163,6 +178,8 @@ func _physics_process(delta: float) -> void:
 		_behavior_runner.process_all(delta)
 	else:
 		_update_player_movement()
+	if _animation_runner:
+		_animation_runner.process_all(delta)
 	_update_interaction_hint()
 	if _event_runner:
 		_event_runner.process_events(delta)

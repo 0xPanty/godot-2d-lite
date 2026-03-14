@@ -26,6 +26,27 @@ split_offset = 280
 custom_minimum_size = Vector2(280, 0)
 layout_mode = 2
 
+[node name="SceneTitle" type="Label" parent="MainSplit/LeftPanel"]
+layout_mode = 2
+text = "场景管理"
+
+[node name="SceneRow" type="HBoxContainer" parent="MainSplit/LeftPanel"]
+layout_mode = 2
+
+[node name="SceneOption" type="OptionButton" parent="MainSplit/LeftPanel/SceneRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="AddSceneBtn" type="Button" parent="MainSplit/LeftPanel/SceneRow"]
+custom_minimum_size = Vector2(32, 0)
+layout_mode = 2
+text = "+"
+
+[node name="RemoveSceneBtn" type="Button" parent="MainSplit/LeftPanel/SceneRow"]
+custom_minimum_size = Vector2(32, 0)
+layout_mode = 2
+text = "−"
+
 [node name="ResourcesTitle" type="Label" parent="MainSplit/LeftPanel"]
 layout_mode = 2
 text = "素材资源"
@@ -266,6 +287,13 @@ text = "行为"
 [node name="BehaviorContainer" type="VBoxContainer" parent="MainSplit/RightPanel/Inspector"]
 layout_mode = 2
 
+[node name="AnimationTitle" type="Label" parent="MainSplit/RightPanel/Inspector"]
+layout_mode = 2
+text = "动画"
+
+[node name="AnimationContainer" type="VBoxContainer" parent="MainSplit/RightPanel/Inspector"]
+layout_mode = 2
+
 [node name="AIPanelTitle" type="Label" parent="MainSplit/RightPanel"]
 layout_mode = 2
 text = "AI 指令"
@@ -291,6 +319,9 @@ text = "示例：\n让这个 NPC 点击后对话\n让这个门碰到后切场景
 title = "导入素材"
 size = Vector2i(900, 560)
 
+[connection signal="item_selected" from="MainSplit/LeftPanel/SceneRow/SceneOption" to="." method="_on_scene_option_selected"]
+[connection signal="pressed" from="MainSplit/LeftPanel/SceneRow/AddSceneBtn" to="." method="_on_add_scene_pressed"]
+[connection signal="pressed" from="MainSplit/LeftPanel/SceneRow/RemoveSceneBtn" to="." method="_on_remove_scene_pressed"]
 [connection signal="pressed" from="MainSplit/LeftPanel/ImportButton" to="." method="_on_import_pressed"]
 [connection signal="pressed" from="MainSplit/CenterPanel/Toolbar/SelectToolButton" to="." method="_on_select_tool_pressed"]
 [connection signal="pressed" from="MainSplit/CenterPanel/Toolbar/GroundToolButton" to="." method="_on_ground_tool_pressed"]
