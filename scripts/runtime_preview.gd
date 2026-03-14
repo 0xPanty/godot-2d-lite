@@ -9,19 +9,10 @@ const InventorySystemScript = preload("res://scripts/inventory_system.gd")
 const QuestSystemScript = preload("res://scripts/quest_system.gd")
 const SaveSystemScript = preload("res://scripts/save_system.gd")
 const AnimationRunnerScript = preload("res://scripts/animation_runner.gd")
+const TileMapBuilderScript = preload("res://scripts/tilemap_builder.gd")
 const DialogueUIScene = preload("res://scenes/dialogue_ui.tscn")
 const InventoryUIScene = preload("res://scenes/inventory_ui.tscn")
-const GRID_SIZE := 32.0
 const INTERACT_DISTANCE := 84.0
-const TERRAIN_COLORS := {
-	"ground": Color("334155"),
-	"wall": Color("475569"),
-	"water": Color("1d4ed8"),
-	"grass": Color("166534"),
-	"sand": Color("a16207"),
-	"path": Color("78716c"),
-}
-
 var scene_objects: Array[Dictionary] = []
 var tile_cells: Array[Dictionary] = []
 var runtime_nodes := {}
@@ -29,7 +20,6 @@ var player_body: CharacterBody2D
 var player_data: Dictionary = {}
 var active_interactable_id := ""
 var consumed_object_ids := {}
-var _world_ground: Node2D
 var _event_runner: Node
 var _behavior_runner: RefCounted
 var _dialogue_ui: CanvasLayer
@@ -210,15 +200,15 @@ func _build_world() -> void:
 	active_interactable_id = ""
 	consumed_object_ids.clear()
 
-	_world_ground = Node2D.new()
-	_world_ground.name = "WorldGround"
-	_world_ground.set_script(_create_ground_drawer_script())
-	_world_ground.set("tile_cells", tile_cells)
-	_world_ground.set("grid_size", GRID_SIZE)
-	_world_ground.set("terrain_colors", TERRAIN_COLORS)
-	world.add_child(_world_ground)
+	var bg := ColorRect.new()
+	bg.color = Color("101828")
+	bg.size = Vector2(2048, 2048)
+	bg.position = Vector2(-512, -512)
+	bg.z_index = -20
+	world.add_child(bg)
 
-	_create_tile_collisions()
+	var tilemap := TileMapBuilderScript.build_tilemap(tile_cells)
+	world.add_child(tilemap)
 
 	for object_data in scene_objects:
 		if String(object_data.get("type", "")) == "player" and player_body == null:
@@ -239,63 +229,6 @@ func _build_world() -> void:
 	for object_data in scene_objects:
 		if String(object_data.get("type", "")) != "player":
 			_create_world_object(object_data)
-
-func _create_ground_drawer_script() -> GDScript:
-	var code := """extends Node2D
-
-var tile_cells: Array = []
-var grid_size: float = 32.0
-var terrain_colors: Dictionary = {}
-
-func _ready() -> void:
-	z_index = -10
-	queue_redraw()
-
-func _draw() -> void:
-	var vp_size := get_viewport_rect().size
-	var cam_pos := Vector2.ZERO
-	var camera := get_viewport().get_camera_2d()
-	if camera:
-		cam_pos = camera.global_position - vp_size / 2.0
-
-	var bg_rect := Rect2(cam_pos, vp_size)
-	draw_rect(bg_rect, Color("101828"), true)
-
-	for tile_data in tile_cells:
-		var terrain: String = str(tile_data.get("terrain", "ground"))
-		var color: Color = terrain_colors.get(terrain, Color("334155"))
-		var cell := Vector2(float(tile_data.get("x", 0)) * grid_size, float(tile_data.get("y", 0)) * grid_size)
-		draw_rect(Rect2(cell, Vector2.ONE * grid_size), color, true)
-
-	var start_x := int(cam_pos.x / grid_size) * int(grid_size)
-	var start_y := int(cam_pos.y / grid_size) * int(grid_size)
-	var end_x := int(cam_pos.x + vp_size.x) + int(grid_size)
-	var end_y := int(cam_pos.y + vp_size.y) + int(grid_size)
-	for x in range(start_x, end_x, int(grid_size)):
-		draw_line(Vector2(x, cam_pos.y), Vector2(x, cam_pos.y + vp_size.y), Color(1, 1, 1, 0.05), 1.0)
-	for y in range(start_y, end_y, int(grid_size)):
-		draw_line(Vector2(cam_pos.x, y), Vector2(cam_pos.x + vp_size.x, y), Color(1, 1, 1, 0.05), 1.0)
-
-func _process(_delta: float) -> void:
-	queue_redraw()
-"""
-	var script := GDScript.new()
-	script.source_code = code
-	script.reload()
-	return script
-
-func _create_tile_collisions() -> void:
-	for tile_data in tile_cells:
-		if String(tile_data.get("terrain", "ground")) != "wall":
-			continue
-		var body := StaticBody2D.new()
-		body.position = Vector2(float(tile_data.get("x", 0)) * GRID_SIZE + GRID_SIZE / 2.0, float(tile_data.get("y", 0)) * GRID_SIZE + GRID_SIZE / 2.0)
-		var collision := CollisionShape2D.new()
-		var shape := RectangleShape2D.new()
-		shape.size = Vector2.ONE * GRID_SIZE
-		collision.shape = shape
-		body.add_child(collision)
-		world.add_child(body)
 
 func _create_player(object_data: Dictionary) -> void:
 	var body := CharacterBody2D.new()

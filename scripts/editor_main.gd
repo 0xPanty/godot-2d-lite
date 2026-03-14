@@ -8,6 +8,7 @@ const EventSystemScript = preload("res://scripts/event_system.gd")
 const BehaviorSystemScript = preload("res://scripts/behavior_system.gd")
 const AnimationSystemScript = preload("res://scripts/animation_system.gd")
 const SceneManagerScript = preload("res://scripts/scene_manager.gd")
+const ResourceLibraryScript = preload("res://scripts/resource_library.gd")
 const OBJECT_TYPES := ["player", "npc", "door", "chest", "trigger", "prop"]
 const TRIGGER_MODES := ["interact", "touch", "area", "auto"]
 const TILE_LAYERS := ["ground", "decoration", "collision"]
@@ -49,6 +50,8 @@ var _ai_pending_object_index := -1
 @onready var prompt_input: TextEdit = $MainSplit/RightPanel/AIPanel/PromptInput
 @onready var behavior_container: VBoxContainer = $MainSplit/RightPanel/Inspector/BehaviorContainer
 @onready var animation_container: VBoxContainer = $MainSplit/RightPanel/Inspector/AnimationContainer
+@onready var template_option: OptionButton = $"MainSplit/CenterPanel/BottomTabs/资源库/LibToolbar/TemplateOption"
+@onready var lib_grid: GridContainer = $"MainSplit/CenterPanel/BottomTabs/资源库/LibScroll/LibGrid"
 
 func _ready() -> void:
 	_undo_redo = UndoRedoScript.new()
@@ -58,6 +61,7 @@ func _ready() -> void:
 	_setup_dialog()
 	_bind_events()
 	_init_scene_manager()
+	_init_resource_library()
 	_load_current_scene()
 	if scene_objects.is_empty():
 		_add_object("player")
@@ -734,6 +738,66 @@ func _remove_animation(object_index: int, anim_id: String) -> void:
 	refresh_inspector()
 	_record_and_save()
 	append_log("已移除动画: %s" % AnimationSystemScript.animation_label(anim_id))
+
+# --- Resource Library ---
+
+func _init_resource_library() -> void:
+	template_option.clear()
+	var templates := ResourceLibraryScript.get_templates()
+	for t in templates:
+		template_option.add_item("%s — %s" % [t.get("name", "?"), t.get("description", "")])
+
+	for child in lib_grid.get_children():
+		child.queue_free()
+	var assets := ResourceLibraryScript.get_assets()
+	for asset in assets:
+		var btn := Button.new()
+		btn.custom_minimum_size = Vector2(100, 60)
+		btn.text = String(asset.get("name", "?"))
+		btn.tooltip_text = String(asset.get("description", ""))
+		var style := StyleBoxFlat.new()
+		style.bg_color = Color(asset.get("color", Color.WHITE), 0.3)
+		style.set_border_width_all(1)
+		style.border_color = asset.get("color", Color.WHITE)
+		style.set_corner_radius_all(4)
+		btn.add_theme_stylebox_override("normal", style)
+		lib_grid.add_child(btn)
+
+func _on_apply_template_pressed() -> void:
+	var idx := template_option.selected
+	var templates := ResourceLibraryScript.get_templates()
+	if idx < 0 or idx >= templates.size():
+		append_log("请先选择一个模板。")
+		return
+	var tmpl := templates[idx]
+	var tmpl_id := String(tmpl.get("id", ""))
+	var result := ResourceLibraryScript.apply_template(tmpl_id)
+
+	scene_objects.clear()
+	tile_cells.clear()
+	_next_object_id = 1
+
+	var obj_defs: Array = result.get("objects", [])
+	for def in obj_defs:
+		var obj_type := String(def.get("type", "prop"))
+		var obj := ProjectStoreScript.default_object(obj_type, _next_object_id)
+		obj["name"] = String(def.get("name", obj["name"]))
+		obj["position"] = Vector2(float(def.get("x", 96)), float(def.get("y", 96)))
+		if not String(def.get("dialogue", "")).is_empty():
+			obj["dialogue"] = String(def.get("dialogue", ""))
+		scene_objects.append(obj)
+		_next_object_id += 1
+
+	var tile_defs: Array = result.get("tile_cells", [])
+	for td in tile_defs:
+		tile_cells.append(td)
+
+	if not scene_objects.is_empty():
+		selected_object_id = String(scene_objects[0].get("id", ""))
+
+	refresh_all()
+	_record_and_save()
+	append_log("已应用模板: %s" % tmpl.get("name", "?"))
 
 # --- Behavior UI ---
 
