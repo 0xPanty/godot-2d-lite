@@ -103,14 +103,31 @@ AI 层 (ai_client.gd → Ollama/OpenAI)
 CLI 层 (ai_cli_bridge.py → editor_state.json)
 ```
 
-## 里程碑 6 要做什么
+## 方向调整（里程碑 5 后）
 
-### 第一优先级
-1. 多工作区编辑器（Tab 式）
-2. 游戏导出（用户的游戏也能打包）
+> 功能够了，形态不对。不再继续堆功能模块，转向产品化。
 
-### 第二优先级
-3. 插件商店
+### 第一优先级：独立 App 导出
+- 用 Godot 导出功能把编辑器场景打包成 Windows/Mac 独立 .exe
+- 用户双击打开就是 Lite2D Studio，不需要装 Godot
+- export_presets.cfg 已有基础配置，需要测试 headless 导出流程
+- 命令：`godot --headless --export-release "Windows Desktop" lite2d-studio.exe`
+
+### 第二优先级：AI 工作流升级
+- 现在 AI 只能"选一个对象→补属性"，太弱
+- 目标：对话式生成整个玩法块
+- 输入："做一个有围墙的村庄，一个NPC给玩家送信任务"
+- 输出：自动生成场景对象 + 地图 + 事件 + 对话 + 任务
+- 这是核心差异化，市面上没有同类产品做到这个
+
+### 第三优先级：用户游戏导出
+- 用户在编辑器里点"发布游戏"→ 生成独立 .exe
+- 内嵌 Godot export template，自动打包用户项目
+- 让用户做完的游戏可以分享给朋友玩
+
+### 不再做（暂缓）
+- 多工作区编辑器布局（Tab 式）— 形态转变后再考虑
+- 插件商店 — 需要先有用户基础
 
 ## 调研报告摘要
 
@@ -141,5 +158,5 @@ python -m py_compile tools/ai_cli_bridge.py
 给新窗口发仓库链接即可（STATUS.md 和 HANDOFF.md 已包含完整状态）：
 ```
 继续做这个仓库：https://github.com/0xPanty/godot-2d-lite
-先看 STATUS.md 和 HANDOFF.md，然后开始里程碑 6
+先看 STATUS.md 和 HANDOFF.md，然后开始独立 App 导出
 ```
