@@ -100,7 +100,8 @@
 | `scripts/resource_library.gd` | 内置资源库（占位资源+项目模板） |
 | `scripts/undo_redo_manager.gd` | 撤销/重做管理器 |
 | `tools/ai_cli_bridge.py` | CLI/API 桥接（10 个命令） |
-| `export_presets.cfg` | 导出预设 |
+| `.github/workflows/build.yml` | CI/CD 自动构建（4 平台导出 + Release 发布） |
+| `export_presets.cfg` | 导出预设（Windows/Linux/macOS/Web） |
 | `research-report.md` | 竞品调研报告（5 款产品 + 导出流程 + Ollama API） |
 
 ## 架构
@@ -132,11 +133,14 @@ CLI 层 (ai_cli_bridge.py → editor_state.json)
 
 > 功能够了，形态不对。不再继续堆功能模块，转向产品化。
 
-### 第一优先级：独立 App 导出
-- 用 Godot 导出功能把编辑器场景打包成 Windows/Mac 独立 .exe
-- 用户双击打开就是 Lite2D Studio，不需要装 Godot
-- export_presets.cfg 已有基础配置，需要测试 headless 导出流程
-- 命令：`godot --headless --export-release "Windows Desktop" lite2d-studio.exe`
+### 第一优先级：独立 App 导出 ✅
+- GitHub Actions CI/CD 已配置（`.github/workflows/build.yml`）
+- 4 个平台自动构建：Windows / Linux / macOS / Web
+- 使用 `barichello/godot-ci:4.3` Docker 镜像
+- 触发条件：push to main / PR / Release / 手动
+- Release 发布时自动打包 zip/tar.gz 附加到 GitHub Release
+- `export_presets.cfg` 已包含所有 4 个平台导出预设
+- 发布流程：创建 GitHub Release → Actions 自动构建 → 用户下载
 
 ### 第二优先级：AI 工作流升级
 - 现在 AI 只能"选一个对象→补属性"，太弱
@@ -176,6 +180,10 @@ Godot --headless --path <仓库路径> --scene res://scenes/runtime_preview.tscn
 python tools/ai_cli_bridge.py --help
 python tools/ai_cli_bridge.py list-objects
 python -m py_compile tools/ai_cli_bridge.py
+
+# 发布独立 App
+# 在 GitHub 上创建 Release → Actions 自动构建 4 平台 → 下载 zip
+# 手动触发：GitHub Actions 页面 → Build & Release → Run workflow
 ```
 
 ## 下次新窗口怎么接上

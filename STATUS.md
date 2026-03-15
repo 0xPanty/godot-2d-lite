@@ -183,10 +183,14 @@
 > 核心问题：用户必须装 Godot 才能用一个比 Godot 更弱的工具。
 > 解决方案：变成独立产品 + AI 驱动交互。
 
-### 下一步：独立 App 导出
-- 把编辑器场景导出为 Windows/Mac 独立 .exe（用户不需要装 Godot）
-- export_presets.cfg 已有配置，需要测试 headless 导出
-- 导出后用户体验：下载 → 双击 → 直接做游戏
+### 独立 App 导出 ✅（CI/CD 已就绪）
+- GitHub Actions 自动构建工作流（`.github/workflows/build.yml`）
+- 4 个平台：Windows / Linux / macOS / Web
+- 使用 `barichello/godot-ci:4.3` Docker 镜像（含 Godot + Export Templates）
+- 触发条件：push to main / PR / 手动触发 / Release 发布
+- Release 发布时自动打包并附加到 GitHub Release 页面
+- 导出预设已配置：`export_presets.cfg`（4 个预设）
+- 用户体验：从 GitHub Releases 下载 → 解压 → 双击运行
 
 ### 再下一步：AI 工作流升级
 - 从"选对象→补属性"升级为"自然语言→生成整个玩法块"
